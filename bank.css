@@ -112,3 +112,10 @@ select.input{appearance:none}
   .app-shell{display:block}.main{padding:0;max-width:none}
   .panel{border:none}.tx-amt.cr{color:#000}.muted{color:#444}
 }
+
+/* add-money method picker */
+.method{display:flex;gap:14px;align-items:center;width:100%;text-align:left;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:14px;padding:14px;margin-bottom:10px;font:inherit;cursor:pointer}
+.method:hover{border-color:var(--accent)}
+.method .ic{font-size:1.5rem}
+.method b{display:block}
+.method small{display:block;color:var(--muted);font-size:.8rem;margin-top:2px}

@@ -3,12 +3,12 @@
 Static site: HTML, CSS and JS. Pages: `index`, `signup`, `login`, `dashboard`.
 
 ## Features
-- Sign up with a custom 10-digit account number (type, generate, use phone number, or pick a suggestion)
+- Sign up with a custom account number (8-12 digits like real US accounts; routing numbers are 9 digits) (type, generate, use phone number, or pick a suggestion)
 - Login with email or account number
 - Dashboard: balance, send money to other Vaulta accounts, saved beneficiaries, bill pay, transaction history with search, CSV export and print
 - 4-digit transaction PIN (5 wrong tries locks it for 5 minutes), password change
 - Debit cards: request virtual (free, instant) or physical (Standard free, Premier $15 expedited, with delivery tracking), activate, freeze, spend limit, show details, cancel
-- "Add money" button adds demo test funds only
+- Add money (demo only, no real money): ACH bank transfer, debit card, mobile check deposit, or direct deposit details
 
 ## Files
 `index.html signup.html login.html dashboard.html styles.css bank.css app.js bank.js vercel.json`

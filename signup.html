@@ -12,7 +12,7 @@
     <a class="logo" href="/">Vault<span>a</span></a>
     <div>
       <h2>Your money.<br>Your number.</h2>
-      <p>Create your account and choose the 10-digit number that represents you.</p>
+      <p>Create your account and choose the account number that represents you.</p>
     </div>
     <small style="color:var(--muted)">Demo project. No real money is held.</small>
   </aside>
@@ -40,8 +40,8 @@
 
       <div class="acct-box">
         <h3>Choose your account number</h3>
-        <p class="sub2">Type any 10 digits, use your phone number, or generate one.</p>
-        <input class="input acct-input" id="acct" inputmode="numeric" maxlength="10" placeholder="0000000000" autocomplete="off">
+        <p class="sub2">Type 8 to 12 digits, use your phone number, or generate one.</p>
+        <input class="input acct-input" id="acct" inputmode="numeric" maxlength="12" placeholder="000000000000" autocomplete="off">
         <div class="hint" id="acctHint"></div>
         <div class="acct-actions">
           <button type="button" class="btn btn-sm" id="btnRandom">🎲 Generate</button>
@@ -105,7 +105,7 @@ function validateAcct() {
   $('acct').classList.toggle('bad', !!v && !r.ok && v.length === 10);
   return r.ok;
 }
-$('acct').addEventListener('input', e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10); validateAcct(); });
+$('acct').addEventListener('input', e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 12); validateAcct(); });
 $('btnRandom').onclick = () => { $('acct').value = Account.random(); validateAcct(); $('chips').innerHTML = ''; };
 $('btnPhone').onclick = () => {
   const n = Account.fromPhone($('phone').value);

@@ -5,122 +5,498 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Dashboard | Vaulta</title>
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="bank.css">
 </head>
 <body>
-<div class="container">
-  <div class="dash-top">
-    <a class="logo" href="/">Vault<span>a</span></a>
-    <button class="btn btn-sm" id="logout">Log out</button>
-  </div>
-
-  <h1 id="hello" style="margin:10px 0 24px;letter-spacing:-.5px"></h1>
-
-  <div class="grid">
-    <div>
-      <div class="bank-card" id="card">
-        <div>
-          <div class="label" id="nick"></div>
-          <div class="label">Account number</div>
-        </div>
-        <div class="num" id="num"></div>
-        <div style="display:flex;justify-content:space-between;align-items:end">
-          <div><div class="label">Balance</div><div class="bal">₦0.00</div></div>
-          <button class="btn btn-sm" id="copy" style="color:#fff;border-color:rgba(255,255,255,.5)">Copy number</button>
-        </div>
-      </div>
-
-      <div class="panel" style="margin-top:20px">
-        <h3>Recent activity</h3>
-        <div class="empty">No transactions yet.</div>
-      </div>
-    </div>
-
-    <div>
-      <div class="panel">
-        <h3>Customize account</h3>
-        <div id="alert" class="alert"></div>
-        <div class="field">
-          <label for="newAcct">Account number</label>
-          <input class="input acct-input" id="newAcct" inputmode="numeric" maxlength="10" style="font-size:1.1rem">
-          <div class="hint" id="hint"></div>
-        </div>
-        <div class="field">
-          <label for="newNick">Nickname</label>
-          <input class="input" id="newNick" maxlength="30">
-        </div>
-        <div class="field">
-          <label>Card colour</label>
-          <div class="themes" id="themes"></div>
-        </div>
-        <button class="btn btn-primary btn-block" id="save">Save changes</button>
-      </div>
-
-      <div class="panel" style="margin-top:20px">
-        <h3>Profile</h3>
-        <div class="stat"><span>Name</span><span id="pName"></span></div>
-        <div class="stat"><span>Email</span><span id="pEmail"></span></div>
-        <div class="stat"><span>Phone</span><span id="pPhone"></span></div>
-        <div class="stat"><span>Joined</span><span id="pJoined"></span></div>
-      </div>
-    </div>
-  </div>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main" id="view"></main>
 </div>
+<nav class="bottom-nav" id="bottomNav"></nav>
 
 <script src="app.js"></script>
+<script src="bank.js"></script>
 <script>
-const $ = id => document.getElementById(id);
-const user = Store.currentUser();
-if (!user) location.replace('login.html');
-let theme = user.theme;
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = Bank.fmt;
+const STATES = 'AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY'.split(' ');
 
-function render() {
-  const u = Store.currentUser();
-  $('hello').textContent = 'Hi, ' + u.name.split(' ')[0] + ' 👋';
-  $('card').style.background = THEMES[u.theme] || THEMES.emerald;
-  $('nick').textContent = u.nickname;
-  $('num').textContent = Account.format(u.accountNumber);
-  $('pName').textContent = u.name; $('pEmail').textContent = u.email; $('pPhone').textContent = u.phone;
-  $('pJoined').textContent = new Date(u.createdAt).toLocaleDateString();
+let me = Bank.me();
+if (!me) location.replace('login.html');
+const refresh = () => { me = Bank.me(); if (!me) location.replace('login.html'); };
+
+let route = 'home', hideBal = false, tTab = 'send', hFilter = 'all', hQuery = '';
+
+const NAV = [
+  ['home', '🏠', 'Home'], ['transfer', '💸', 'Send'], ['cards', '💳', 'Cards'],
+  ['history', '🧾', 'History'], ['settings', '⚙️', 'Settings']
+];
+
+/* ---------- helpers ---------- */
+function toast(msg, type = 'ok') {
+  $$('.toast').forEach(t => t.remove());
+  const t = document.createElement('div');
+  t.className = 'toast ' + type; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
 }
-render();
-$('newAcct').value = user.accountNumber;
-$('newNick').value = user.nickname;
-
-function drawThemes() {
-  $('themes').innerHTML = '';
-  Object.entries(THEMES).forEach(([key, bg]) => {
-    const d = document.createElement('div');
-    d.className = 'theme-dot' + (key === theme ? ' active' : '');
-    d.style.background = bg; d.title = key;
-    d.onclick = () => { theme = key; drawThemes(); };
-    $('themes').appendChild(d);
+function closeModal() { $$('.overlay').forEach(o => o.remove()); }
+function modal(html, dismissable = true) {
+  closeModal();
+  const o = document.createElement('div');
+  o.className = 'overlay';
+  o.innerHTML = '<div class="modal">' + html + '</div>';
+  if (dismissable) o.addEventListener('click', e => { if (e.target === o) closeModal(); });
+  document.body.appendChild(o);
+  return o.firstChild;
+}
+function promptModal(html, mount) {
+  return new Promise(res => {
+    const m = modal(html, false);
+    const done = v => { closeModal(); res(v); };
+    $$('[data-cancel]', m).forEach(b => b.onclick = () => done(null));
+    m.parentElement.addEventListener('click', e => { if (e.target === m.parentElement) done(null); });
+    mount(m, done);
   });
 }
-drawThemes();
+const digitsOnly = el => el.addEventListener('input', () => { el.value = el.value.replace(/\D/g, ''); });
 
-$('newAcct').addEventListener('input', e => {
-  e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10);
-  const r = Account.check(e.target.value, user.id);
-  $('hint').textContent = r.msg; $('hint').className = 'hint ' + (r.ok ? 'ok' : 'err');
+function askPin(title) {
+  if (!me.pinHash) return createPin();
+  return promptModal(
+    `<h3>${esc(title || 'Enter transaction PIN')}</h3>
+     <input class="input pin-input" id="pinIn" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="off">
+     <div class="modal-actions"><button class="btn" data-cancel>Cancel</button><button class="btn btn-primary" id="pinOk">Confirm</button></div>`,
+    (m, done) => {
+      const inp = $('#pinIn', m); digitsOnly(inp);
+      const go = () => inp.value.length === 4 ? done(inp.value) : toast('Enter your 4-digit PIN', 'err');
+      $('#pinOk', m).onclick = go;
+      inp.addEventListener('keydown', e => e.key === 'Enter' && go());
+      setTimeout(() => inp.focus(), 50);
+    });
+}
+function createPin() {
+  return promptModal(
+    `<h3>Create your transaction PIN</h3>
+     <p class="muted small" style="margin-bottom:14px">You'll use this 4-digit PIN to confirm transfers, bill payments and card actions.</p>
+     <div class="field"><label>New PIN</label><input class="input pin-input" id="p1" type="password" inputmode="numeric" maxlength="4" autocomplete="off"></div>
+     <div class="field"><label>Confirm PIN</label><input class="input pin-input" id="p2" type="password" inputmode="numeric" maxlength="4" autocomplete="off"></div>
+     <div class="modal-actions"><button class="btn" data-cancel>Cancel</button><button class="btn btn-primary" id="pinSave">Save PIN</button></div>`,
+    (m, done) => {
+      $$('input', m).forEach(digitsOnly);
+      $('#pinSave', m).onclick = async () => {
+        const a = $('#p1', m).value, b = $('#p2', m).value;
+        if (a !== b) return toast('PINs do not match', 'err');
+        const r = await Bank.setPin(me.id, a, '');
+        if (!r.ok) return toast(r.msg, 'err');
+        refresh(); toast('PIN saved'); done(a);
+      };
+    });
+}
+function confirmModal(title, rows, btn = 'Continue') {
+  return promptModal(
+    `<h3>${esc(title)}</h3>${rows.map(([k, v]) => `<div class="stat"><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('')}
+     <div class="modal-actions"><button class="btn" data-cancel>Cancel</button><button class="btn btn-primary" id="cOk">${esc(btn)}</button></div>`,
+    (m, done) => { $('#cOk', m).onclick = () => done(true); });
+}
+function fieldModal(title, label, placeholder, btn, opts = {}) {
+  return promptModal(
+    `<h3>${esc(title)}</h3><div class="field"><label>${esc(label)}</label><input class="input" id="fIn" ${opts.numeric ? 'inputmode="decimal"' : ''} placeholder="${esc(placeholder)}" value="${esc(opts.value || '')}"></div>
+     <div class="modal-actions"><button class="btn" data-cancel>Cancel</button><button class="btn btn-primary" id="fOk">${esc(btn)}</button></div>`,
+    (m, done) => {
+      const i = $('#fIn', m);
+      if (opts.numeric) i.addEventListener('input', () => { i.value = i.value.replace(/[^\d.]/g, ''); });
+      $('#fOk', m).onclick = () => done(i.value);
+      i.addEventListener('keydown', e => e.key === 'Enter' && done(i.value));
+      setTimeout(() => i.focus(), 50);
+    });
+}
+
+const txIcon = t => ({ transfer: t.type === 'credit' ? '⬇️' : '⬆️', bill: '📄', deposit: '➕', fee: '🏷️' }[t.category] || '•');
+const txTitle = t => t.category === 'transfer' ? (t.type === 'credit' ? 'From ' : 'To ') + t.counterparty.name
+  : t.category === 'bill' ? 'Bill · ' + t.counterparty.name
+  : t.category === 'deposit' ? 'Demo top-up' : t.narration;
+const dt = ms => new Date(ms).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+function txRow(t) {
+  const cr = t.type === 'credit';
+  return `<div class="tx" data-act="receipt" data-id="${esc(t.id)}">
+    <div class="tx-ic">${txIcon(t)}</div>
+    <div class="tx-mid"><b>${esc(txTitle(t))}</b><span class="muted small">${dt(t.date)}</span></div>
+    <div class="tx-amt ${cr ? 'cr' : 'dr'}">${cr ? '+' : '-'}${fmt(t.amount)}</div></div>`;
+}
+function receipt(t) {
+  const cr = t.type === 'credit';
+  modal(`<div class="receipt-top"><div class="tick">✓</div><div class="big">${cr ? '+' : '-'}${fmt(t.amount)}</div><div class="muted">${esc(t.status)}</div></div>
+    <div class="stat"><span>${cr ? 'From' : 'To'}</span><b>${esc(t.counterparty.name)}</b></div>
+    ${t.counterparty.acct && t.category === 'transfer' ? `<div class="stat"><span>Account</span><b>${esc(t.counterparty.acct)}</b></div>` : ''}
+    <div class="stat"><span>Type</span><b>${esc(t.category)}</b></div>
+    <div class="stat"><span>Narration</span><b>${esc(t.narration || '-')}</b></div>
+    <div class="stat"><span>Date</span><b>${dt(t.date)}</b></div>
+    <div class="stat"><span>Reference</span><b>${esc(t.id)}</b></div>
+    <div class="stat"><span>Balance after</span><b>${fmt(t.balanceAfter)}</b></div>
+    <div class="modal-actions"><button class="btn" data-act="copyRef" data-id="${esc(t.id)}">Copy ref</button><button class="btn btn-primary" data-act="closeModal">Done</button></div>`);
+}
+
+/* ---------- views ---------- */
+function viewHome() {
+  const rec = me.transactions.slice(0, 5);
+  const live = me.cards.filter(c => c.status !== 'cancelled');
+  return `<h1 class="page-title">Hi, ${esc(me.name.split(' ')[0])} 👋</h1>
+  <div class="bank-card" style="background:${THEMES[me.theme] || THEMES.emerald}">
+    <div><div class="label">${esc(me.nickname)}</div><div class="label">Available balance</div></div>
+    <div class="bal-big">${hideBal ? '$ ••••••' : fmt(me.balance)}</div>
+    <div class="card-foot">
+      <div><div class="label">Checking · Routing ${Bank.ROUTING}</div><div class="num-sm">${esc(me.accountNumber)}</div></div>
+      <div class="row-btns"><button class="btn btn-sm glass" data-act="toggleBal">${hideBal ? 'Show' : 'Hide'}</button><button class="btn btn-sm glass" data-act="copyAcct">Copy</button></div>
+    </div>
+  </div>
+  <div class="quick">
+    <button data-go="transfer"><span class="ic">💸</span>Send money</button>
+    <button data-act="addMoney"><span class="ic">➕</span>Add money</button>
+    <button data-act="billGo"><span class="ic">📄</span>Pay bills</button>
+    <button data-go="cardreq"><span class="ic">💳</span>Get a card</button>
+  </div>
+  ${live.length ? '' : `<div class="panel" style="margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+    <div><b>Request your debit card</b><div class="muted small">Virtual cards are free and instant.</div></div><button class="btn btn-primary btn-sm" data-go="cardreq">Request card</button></div>`}
+  <div class="panel"><div class="panel-head"><h3>Recent activity</h3><button class="link-btn" data-go="history">See all</button></div>
+    ${rec.length ? rec.map(txRow).join('') : '<div class="empty">No transactions yet. Add demo money to get started.</div>'}</div>`;
+}
+
+function viewTransfer() {
+  const used = Bank.spentToday(me);
+  const head = `<h1 class="page-title">Send money</h1>
+    <div class="seg"><button data-act="tab" data-v="send" class="${tTab === 'send' ? 'on' : ''}">Send money</button><button data-act="tab" data-v="bills" class="${tTab === 'bills' ? 'on' : ''}">Pay bills</button></div>`;
+  const limit = `<div class="limit-note">Balance ${fmt(me.balance)} · Daily limit ${fmt(Bank.DAILY_LIMIT)} (used today ${fmt(used)})</div>`;
+  if (tTab === 'bills') return head + `<form class="panel" id="billForm">${limit}
+    <div class="field"><label>Bill type</label><select class="input" id="aCat">${Bank.BILL_CATEGORIES.map(c => `<option>${esc(c)}</option>`).join('')}</select></div>
+    <div class="field"><label>Payee</label><input class="input" id="aPayee" maxlength="40" placeholder="e.g. City Power & Light"></div>
+    <div class="field"><label>Account number on your bill</label><input class="input" id="aRef" maxlength="30" placeholder="Account or reference number"></div>
+    <div class="field"><label>Amount ($)</label><input class="input" id="aAmt" inputmode="decimal" placeholder="0.00"></div>
+    <button class="btn btn-primary btn-block">Pay bill</button></form>`;
+  return head + `<form class="panel" id="sendForm">${limit}
+    ${me.beneficiaries.length ? `<label class="lbl">Saved beneficiaries</label><div class="bene-row">${me.beneficiaries.map(b => `<button type="button" class="chip" data-act="pickBene" data-acct="${esc(b.acct)}">${esc(b.name.split(' ')[0])} · ${esc(b.acct.slice(-4))}</button>`).join('')}</div>` : ''}
+    <div class="field"><label>Recipient account number</label><input class="input" id="sAcct" inputmode="numeric" maxlength="10" placeholder="10 digits"><div class="hint" id="sHint"></div></div>
+    <div class="field"><label>Amount ($)</label><input class="input" id="sAmt" inputmode="decimal" placeholder="0.00"></div>
+    <div class="field"><label>Narration (optional)</label><input class="input" id="sNote" maxlength="60" placeholder="What's it for?"></div>
+    <label class="chk"><input type="checkbox" id="sSave"> Save as beneficiary</label>
+    <button class="btn btn-primary btn-block">Continue</button></form>`;
+}
+
+function trackHtml(c) {
+  if (c.kind !== 'physical') return '';
+  const idx = Bank.STAGES.indexOf(c.status);
+  return '<div class="track">' + Bank.STAGES.map((s, i) => `<div class="step ${i <= idx ? 'done' : ''}"><i></i>${Bank.STAGE_LABEL[s]}</div>`).join('') + '</div>' +
+    (c.status !== 'active' ? `<p class="muted small">Estimated delivery: ${new Date(c.requestedAt + (c.tier === 'platinum' ? 5 : 10) * 864e5).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })} · ${esc(c.delivery.city)}</p>` : '');
+}
+function cardVisual(c) {
+  const t = Bank.TIERS[c.tier];
+  const pending = c.kind === 'physical' && c.status !== 'active';
+  return `<div class="vcard" style="background:${t.bg}">
+    <div class="vc-top"><b>Vaulta</b><span class="badge">${c.kind === 'virtual' ? 'VIRTUAL' : esc(t.label.toUpperCase())}</span></div>
+    <div class="vc-chip"></div>
+    <div class="vc-num">${c.number.slice(0, 4)} •••• •••• ${c.number.slice(-4)}</div>
+    <div class="vc-bot"><div><small>CARD HOLDER</small>${esc(c.nameOnCard)}</div><div><small>EXPIRES</small>${esc(c.expiry)}</div></div>
+    ${c.frozen ? '<div class="vc-ov">❄ Frozen</div>' : pending ? `<div class="vc-ov soft">${esc(Bank.STAGE_LABEL[c.status])}</div>` : ''}</div>`;
+}
+function cardBlock(c) {
+  const t = Bank.TIERS[c.tier];
+  let acts = '';
+  if (c.status === 'active') acts = `<button class="btn btn-sm" data-act="reveal" data-id="${c.id}">Show details</button>
+    <button class="btn btn-sm" data-act="freeze" data-id="${c.id}">${c.frozen ? 'Unfreeze' : 'Freeze'}</button>
+    <button class="btn btn-sm" data-act="limit" data-id="${c.id}">Spend limit</button>
+    <button class="btn btn-sm btn-danger" data-act="cancelCard" data-id="${c.id}">Cancel card</button>`;
+  else if (c.status === 'delivered') acts = `<button class="btn btn-sm btn-primary" data-act="activate" data-id="${c.id}">Activate card</button>`;
+  else acts = `<button class="btn btn-sm" data-act="advance" data-id="${c.id}">Demo: next delivery stage</button>
+    <button class="btn btn-sm btn-danger" data-act="cancelCard" data-id="${c.id}">Cancel request</button>`;
+  return `<div class="card-block">${cardVisual(c)}<div>
+    <h3>${esc(t.label)} ${c.kind} card</h3>
+    <p class="muted small" style="margin:4px 0 12px">Ending ${c.number.slice(-4)} · ${c.limit ? 'Daily spend limit ' + fmt(c.limit) : 'No custom spend limit'}</p>
+    ${trackHtml(c)}<div class="card-actions">${acts}</div></div></div>`;
+}
+function viewCards() {
+  const cards = me.cards.filter(c => c.status !== 'cancelled');
+  return `<div class="panel-head"><h1 class="page-title" style="margin:0">Your cards</h1><button class="btn btn-primary btn-sm" data-go="cardreq">+ Request card</button></div>
+    <div class="panel">${cards.length ? cards.map(cardBlock).join('') : '<div class="empty">You have no cards yet.<br><br><button class="btn btn-primary" data-go="cardreq">Request your debit card</button></div>'}</div>
+    <p class="muted small" style="margin-top:12px">Demo cards use fictional numbers and cannot be used for real payments.</p>`;
+}
+function viewCardReq() {
+  return `<button class="btn btn-sm" data-go="cards">← Back</button>
+  <h1 class="page-title" style="margin-top:14px">Request your debit card</h1>
+  <form class="panel" id="cardForm">
+    <label class="lbl">Choose a card</label>
+    <div class="tier-grid">${Object.entries(Bank.TIERS).map(([k, t], i) => `<label class="tier"><input type="radio" name="tier" value="${k}" ${i === 0 ? 'checked' : ''}>
+      <div class="tier-in"><div class="mini" style="background:${t.bg}"></div><b>${t.label}</b><small>${t.fee ? fmt(t.fee) : 'Free'}</small><small class="muted">${esc(t.note)}</small></div></label>`).join('')}</div>
+    <div class="field"><label>Name on card</label><input class="input" id="cName" maxlength="22" value="${esc(me.name.toUpperCase().slice(0, 22))}"></div>
+    <div id="shipBox" style="display:none">
+      <div class="field"><label>Street address</label><input class="input" id="cAddr" placeholder="123 Main St" autocomplete="address-line1"></div>
+      <div class="field"><label>Apt / Suite (optional)</label><input class="input" id="cApt" autocomplete="address-line2"></div>
+      <div class="row"><div class="field"><label>City</label><input class="input" id="cCity" autocomplete="address-level2"></div>
+      <div class="field"><label>State</label><select class="input" id="cState"><option value="">Select</option>${STATES.map(s => `<option>${s}</option>`).join('')}</select></div></div>
+      <div class="row"><div class="field"><label>ZIP code</label><input class="input" id="cZip" inputmode="numeric" maxlength="5" placeholder="10001" autocomplete="postal-code"></div>
+      <div class="field"><label>Phone</label><input class="input" id="cPhone" inputmode="tel" value="${esc(me.phone)}"></div></div>
+    </div>
+    <div class="stat"><span>Card fee</span><b id="feeOut"></b></div>
+    <div class="stat"><span>Available balance</span><b>${fmt(me.balance)}</b></div>
+    <button class="btn btn-primary btn-block" style="margin-top:16px">Request card</button>
+  </form>`;
+}
+
+function filteredTx() {
+  const q = hQuery.toLowerCase();
+  return me.transactions.filter(t => (hFilter === 'all' || t.type === hFilter) &&
+    (!q || (txTitle(t) + ' ' + t.narration + ' ' + t.id).toLowerCase().includes(q)));
+}
+function viewHistory() {
+  return `<h1 class="page-title">Transaction history</h1>
+  <div class="filters">${[['all', 'All'], ['credit', 'Money in'], ['debit', 'Money out']].map(([k, l]) => `<button class="pill ${hFilter === k ? 'on' : ''}" data-act="filter" data-v="${k}">${l}</button>`).join('')}
+    <input class="input" id="hSearch" placeholder="Search" value="${esc(hQuery)}">
+    <button class="btn btn-sm" data-act="csv">Export CSV</button><button class="btn btn-sm" data-act="print">Print</button></div>
+  <div class="panel" id="histList"></div>`;
+}
+function drawHist() {
+  const list = filteredTx();
+  $('#histList').innerHTML = list.length ? list.map(txRow).join('') : '<div class="empty">No transactions found.</div>';
+}
+
+function viewSettings() {
+  return `<h1 class="page-title">Settings</h1>
+  <div class="panel"><h3 class="sec-title">Account details</h3>
+    <div class="stat"><span>Account type</span><b>Checking</b></div>
+    <div class="stat"><span>Routing number</span><b>${Bank.ROUTING}</b></div>
+    <div class="stat"><span>Account number</span><b>${esc(me.accountNumber)}</b></div>
+    <p class="muted small" style="margin-top:10px">Demo numbers. This is not a real bank account.</p></div>
+  <form class="panel" id="profForm"><h3 class="sec-title">Profile</h3>
+    <div class="field"><label>Full name</label><input class="input" id="stName" value="${esc(me.name)}"></div>
+    <div class="row"><div class="field"><label>Email</label><input class="input" value="${esc(me.email)}" disabled></div>
+    <div class="field"><label>Phone</label><input class="input" id="stPhone" value="${esc(me.phone)}"></div></div>
+    <button class="btn btn-primary">Save profile</button></form>
+  <form class="panel" id="acctForm"><h3 class="sec-title">Customize account</h3>
+    <div class="field"><label>Account number</label><input class="input acct-input" id="stAcct" inputmode="numeric" maxlength="10" value="${esc(me.accountNumber)}"><div class="hint" id="stHint"></div></div>
+    <div class="field"><label>Nickname</label><input class="input" id="stNick" maxlength="30" value="${esc(me.nickname)}"></div>
+    <div class="field"><label>Account colour</label><div class="themes" id="stThemes"></div></div>
+    <button class="btn btn-primary">Save changes</button></form>
+  <form class="panel" id="pinForm"><h3 class="sec-title">${me.pinHash ? 'Change' : 'Create'} transaction PIN</h3>
+    ${me.pinHash ? '<div class="field"><label>Current PIN</label><input class="input" id="pnCur" type="password" inputmode="numeric" maxlength="4"></div>' : ''}
+    <div class="row"><div class="field"><label>New PIN</label><input class="input" id="pnNew" type="password" inputmode="numeric" maxlength="4"></div>
+    <div class="field"><label>Confirm PIN</label><input class="input" id="pnNew2" type="password" inputmode="numeric" maxlength="4"></div></div>
+    <button class="btn btn-primary">Save PIN</button></form>
+  <form class="panel" id="pwForm"><h3 class="sec-title">Change password</h3>
+    <div class="field"><label>Current password</label><input class="input" id="pwCur" type="password" autocomplete="current-password"></div>
+    <div class="field"><label>New password (min 8 characters)</label><input class="input" id="pwNew" type="password" autocomplete="new-password"></div>
+    <button class="btn btn-primary">Update password</button></form>
+  <div class="panel"><button class="btn btn-danger" data-act="logout">Log out</button></div>`;
+}
+
+/* ---------- wiring per view ---------- */
+let stTheme;
+const wire = {
+  transfer() {
+    const f = $('#sendForm'), a = $('#billForm');
+    if (a) {
+      $('#aAmt').addEventListener('input', e => e.target.value = e.target.value.replace(/[^\d.]/g, ''));
+      a.onsubmit = async e => {
+        e.preventDefault();
+        const cat = $('#aCat').value, payee = $('#aPayee').value.trim(), ref = $('#aRef').value.trim(), amt = Bank.toKobo($('#aAmt').value);
+        if (payee.length < 2) return toast('Enter the payee name', 'err');
+        if (ref.length < 4) return toast('Enter the account number from your bill', 'err');
+        if (!(amt >= 100)) return toast('Minimum payment is $1.00', 'err');
+        if (amt > me.balance) return toast('Insufficient balance', 'err');
+        if (!await confirmModal('Confirm bill payment', [['Type', cat], ['Payee', payee], ['Account', ref], ['Amount', fmt(amt)]], 'Pay')) return;
+        const pin = await askPin(); if (!pin) return;
+        const r = await Bank.billPay(me.id, cat, payee, ref, amt, pin);
+        if (!r.ok) return toast(r.msg, 'err');
+        refresh(); receipt(r.tx); show('transfer');
+      };
+      return;
+    }
+    const acct = $('#sAcct'), hint = $('#sHint');
+    digitsOnly(acct);
+    $('#sAmt').addEventListener('input', e => e.target.value = e.target.value.replace(/[^\d.]/g, ''));
+    const check = () => {
+      if (acct.value.length < 10) { hint.textContent = ''; hint.className = 'hint'; return null; }
+      const r = Bank.lookup(acct.value);
+      if (!r) { hint.textContent = 'Account not found.'; hint.className = 'hint err'; return null; }
+      if (r.id === me.id) { hint.textContent = "That's your own account."; hint.className = 'hint err'; return null; }
+      hint.textContent = '✓ ' + r.name; hint.className = 'hint ok'; return r;
+    };
+    acct.addEventListener('input', check);
+    window.__checkAcct = check;
+    f.onsubmit = async e => {
+      e.preventDefault();
+      const rec = check(), amt = Bank.toKobo($('#sAmt').value), note = $('#sNote').value.trim();
+      if (!rec) return toast('Enter a valid recipient account number', 'err');
+      if (!(amt >= 100)) return toast('Minimum transfer is $1.00', 'err');
+      if (amt > me.balance) return toast('Insufficient balance', 'err');
+      if (!await confirmModal('Confirm transfer', [['To', rec.name], ['Account', rec.acct], ['Amount', fmt(amt)], ['Narration', note || '-']], 'Send')) return;
+      const pin = await askPin(); if (!pin) return;
+      const r = await Bank.transfer(me.id, rec.acct, amt, note, pin);
+      if (!r.ok) return toast(r.msg, 'err');
+      if ($('#sSave').checked) Bank.addBeneficiary(me.id, rec);
+      refresh(); receipt(r.tx); show('transfer');
+    };
+  },
+  cardreq() {
+    const upd = () => {
+      const tier = $('input[name=tier]:checked').value, t = Bank.TIERS[tier];
+      $('#shipBox').style.display = t.physical ? 'block' : 'none';
+      $('#feeOut').textContent = t.fee ? fmt(t.fee) : 'Free';
+    };
+    $$('input[name=tier]').forEach(r => r.addEventListener('change', upd)); upd();
+    digitsOnly($('#cPhone')); digitsOnly($('#cZip'));
+    $('#cardForm').onsubmit = async e => {
+      e.preventDefault();
+      const tier = $('input[name=tier]:checked').value, t = Bank.TIERS[tier];
+      const o = { tier, nameOnCard: $('#cName').value, address: $('#cAddr').value, apt: $('#cApt').value, city: $('#cCity').value, state: $('#cState').value, zip: $('#cZip').value, phone: $('#cPhone').value };
+      if (t.fee > me.balance) return toast(`Insufficient balance. This card costs ${fmt(t.fee)}.`, 'err');
+      const rows = [['Card', t.label + (t.physical ? ' (physical)' : ' (virtual)')], ['Name', o.nameOnCard.toUpperCase()], ['Fee', t.fee ? fmt(t.fee) : 'Free']];
+      if (t.physical) rows.push(['Deliver to', `${o.address}${o.apt ? ', ' + o.apt : ''}, ${o.city}, ${o.state} ${o.zip}`]);
+      if (!await confirmModal('Confirm card request', rows, 'Continue')) return;
+      const pin = await askPin(); if (!pin) return;
+      const r = await Bank.requestCard(me.id, o, pin);
+      if (!r.ok) return toast(r.msg, 'err');
+      refresh(); toast(t.physical ? 'Card requested. Track delivery below.' : 'Virtual card is ready!'); show('cards');
+    };
+  },
+  history() {
+    drawHist();
+    $('#hSearch').addEventListener('input', e => { hQuery = e.target.value; drawHist(); });
+  },
+  settings() {
+    digitsOnly($('#stAcct'));
+    $$('#pinForm input').forEach(digitsOnly);
+    stTheme = me.theme;
+    const draw = () => {
+      $('#stThemes').innerHTML = '';
+      Object.entries(THEMES).forEach(([k, bg]) => {
+        const d = document.createElement('div'); d.className = 'theme-dot' + (k === stTheme ? ' active' : '');
+        d.style.background = bg; d.onclick = () => { stTheme = k; draw(); }; $('#stThemes').appendChild(d);
+      });
+    };
+    draw();
+    $('#stAcct').addEventListener('input', e => {
+      const r = Account.check(e.target.value, me.id); const h = $('#stHint');
+      h.textContent = r.msg; h.className = 'hint ' + (r.ok ? 'ok' : 'err');
+    });
+    $('#profForm').onsubmit = e => {
+      e.preventDefault();
+      const name = $('#stName').value.trim(), phone = $('#stPhone').value.trim();
+      if (name.length < 2) return toast('Enter your name', 'err');
+      if (phone.replace(/\D/g, '').length < 10) return toast('Enter a valid phone number', 'err');
+      Store.updateUser(me.id, { name, phone }); refresh(); toast('Profile saved'); show('settings');
+    };
+    $('#acctForm').onsubmit = async e => {
+      e.preventDefault();
+      const n = $('#stAcct').value, r = Account.check(n, me.id);
+      if (!r.ok) return toast(r.msg, 'err');
+      if (n !== me.accountNumber) { const pin = await askPin('Confirm with your PIN'); if (!pin) return; const c = await Bank.checkPin(me.id, pin); if (!c.ok) return toast(c.msg, 'err'); }
+      Store.updateUser(me.id, { accountNumber: n, nickname: $('#stNick').value.trim() || 'Main Account', theme: stTheme });
+      refresh(); toast('Account updated'); show('settings');
+    };
+    $('#pinForm').onsubmit = async e => {
+      e.preventDefault();
+      const a = $('#pnNew').value, b = $('#pnNew2').value;
+      if (a !== b) return toast('PINs do not match', 'err');
+      const r = await Bank.setPin(me.id, a, me.pinHash ? $('#pnCur').value : '');
+      if (!r.ok) return toast(r.msg, 'err');
+      refresh(); toast('PIN updated'); show('settings');
+    };
+    $('#pwForm').onsubmit = async e => {
+      e.preventDefault();
+      const r = await Bank.changePassword(me.id, $('#pwCur').value, $('#pwNew').value);
+      if (!r.ok) return toast(r.msg, 'err');
+      $('#pwCur').value = ''; $('#pwNew').value = ''; toast('Password updated');
+    };
+  }
+};
+
+/* ---------- actions ---------- */
+const byId = id => me.transactions.find(t => t.id === id);
+const acts = {
+  closeModal,
+  toggleBal() { hideBal = !hideBal; show('home'); },
+  async copyAcct() { try { await navigator.clipboard.writeText(me.accountNumber); toast('Account number copied'); } catch { toast(me.accountNumber); } },
+  async copyRef(el) { try { await navigator.clipboard.writeText(el.dataset.id); toast('Reference copied'); } catch { toast(el.dataset.id); } },
+  receipt(el) { const t = byId(el.dataset.id); if (t) receipt(t); },
+  tab(el) { tTab = el.dataset.v; show('transfer'); },
+  pickBene(el) { const i = $('#sAcct'); i.value = el.dataset.acct; i.dispatchEvent(new Event('input')); $('#sAmt').focus(); },
+  billGo() { tTab = 'bills'; show('transfer'); },
+  filter(el) { hFilter = el.dataset.v; show('history'); },
+  csv() {
+    const blob = new Blob([Bank.toCsv(me, filteredTx())], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'vaulta-statement-' + me.accountNumber + '.csv'; a.click(); URL.revokeObjectURL(a.href);
+  },
+  print() { window.print(); },
+  logout() { Store.clearSession(); location.href = 'login.html'; },
+  async addMoney() {
+    const v = await fieldModal('Add demo money', 'Amount ($) — test funds, not real money. Max ' + fmt(Bank.MAX_TOPUP) + ' each.', '1000', 'Add', { numeric: true, value: '1000' });
+    if (v === null) return;
+    const r = Bank.fund(me.id, Bank.toKobo(v));
+    if (!r.ok) return toast(r.msg, 'err');
+    refresh(); toast(fmt(Bank.toKobo(v)) + ' added'); show(route);
+  },
+  async reveal(el) {
+    const pin = await askPin('Enter PIN to show card details'); if (!pin) return;
+    const r = await Bank.revealCard(me.id, el.dataset.id, pin);
+    if (!r.ok) return toast(r.msg, 'err');
+    modal(`<h3>Card details</h3><div class="stat"><span>Number</span><b>${r.number.replace(/(\d{4})(?=\d)/g, '$1 ')}</b></div>
+      <div class="stat"><span>Expiry</span><b>${esc(r.expiry)}</b></div><div class="stat"><span>CVV</span><b>${esc(r.cvv)}</b></div>
+      <p class="muted small" style="margin-top:10px">Demo card. Fictional number.</p>
+      <div class="modal-actions"><button class="btn btn-primary" data-act="closeModal">Close</button></div>`);
+  },
+  freeze(el) { const r = Bank.toggleFreeze(me.id, el.dataset.id); if (!r.ok) return toast(r.msg, 'err'); refresh(); toast(r.card.frozen ? 'Card frozen' : 'Card unfrozen'); show('cards'); },
+  async limit(el) {
+    const v = await fieldModal('Daily spend limit', 'Amount ($). Use 0 for no custom limit.', '1000', 'Save', { numeric: true });
+    if (v === null) return;
+    const r = Bank.setCardLimit(me.id, el.dataset.id, Bank.toKobo(v || '0'));
+    if (!r.ok) return toast(r.msg, 'err');
+    refresh(); toast('Limit saved'); show('cards');
+  },
+  async cancelCard(el) {
+    if (!await confirmModal('Cancel this card?', [['Note', 'This cannot be undone. Fees are not refunded.']], 'Cancel card')) return;
+    const r = Bank.cancelCard(me.id, el.dataset.id); if (!r.ok) return toast(r.msg, 'err');
+    refresh(); toast('Card cancelled'); show('cards');
+  },
+  advance(el) { const r = Bank.advanceCard(me.id, el.dataset.id); if (!r.ok) return toast(r.msg, 'err'); refresh(); show('cards'); },
+  async activate(el) {
+    const pin = await askPin('Enter PIN to activate card'); if (!pin) return;
+    const r = await Bank.activateCard(me.id, el.dataset.id, pin);
+    if (!r.ok) return toast(r.msg, 'err');
+    refresh(); toast('Card activated'); show('cards');
+  }
+};
+
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-act]');
+  if (a && acts[a.dataset.act]) { acts[a.dataset.act](a); return; }
+  const g = e.target.closest('[data-go]');
+  if (g) { closeModal(); show(g.dataset.go); }
 });
 
-$('save').onclick = () => {
-  const n = $('newAcct').value;
-  const r = Account.check(n, user.id);
-  if (!r.ok) return showAlert($('alert'), 'err', r.msg);
-  Store.updateUser(user.id, { accountNumber: n, nickname: $('newNick').value.trim() || 'Main Account', theme });
-  render();
-  showAlert($('alert'), 'ok', 'Saved.');
-};
-
-$('copy').onclick = async () => {
-  const u = Store.currentUser();
-  try { await navigator.clipboard.writeText(u.accountNumber); $('copy').textContent = 'Copied!'; }
-  catch { $('copy').textContent = u.accountNumber; }
-  setTimeout(() => $('copy').textContent = 'Copy number', 1500);
-};
-
-$('logout').onclick = () => { Store.clearSession(); location.href = 'login.html'; };
+/* ---------- render ---------- */
+const VIEWS = { home: viewHome, transfer: viewTransfer, cards: viewCards, cardreq: viewCardReq, history: viewHistory, settings: viewSettings };
+function renderNav() {
+  const active = route === 'cardreq' ? 'cards' : route;
+  $('#sidebar').innerHTML = `<a class="logo" href="/">Vault<span>a</span></a>` +
+    NAV.map(([k, ic, l]) => `<button class="side-link ${k === active ? 'active' : ''}" data-go="${k}">${ic} ${l}</button>`).join('') +
+    `<div class="side-foot"><div class="muted small" style="padding:0 14px 10px">${esc(me.name)}</div><button class="side-link" data-act="logout">🚪 Log out</button></div>`;
+  $('#bottomNav').innerHTML = NAV.map(([k, ic, l]) => `<button class="${k === active ? 'active' : ''}" data-go="${k}"><span>${ic}</span>${l}</button>`).join('');
+}
+function show(r) {
+  route = VIEWS[r] ? r : 'home';
+  if (location.hash !== '#' + route) history.replaceState(null, '', '#' + route);
+  refresh();
+  if (!me) return;
+  $('#view').innerHTML = VIEWS[route]();
+  if (wire[route]) wire[route]();
+  renderNav();
+  window.scrollTo(0, 0);
+}
+window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (h !== route && VIEWS[h]) show(h); });
+show(location.hash.slice(1) || 'home');
 </script>
 </body>
 </html>

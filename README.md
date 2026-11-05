@@ -2,14 +2,22 @@
 
 Static site: HTML, CSS and JS. Pages: `index`, `signup`, `login`, `dashboard`.
 
+## Features
+- Sign up with a custom 10-digit account number (type, generate, use phone number, or pick a suggestion)
+- Login with email or account number
+- Dashboard: balance, send money to other Vaulta accounts, saved beneficiaries, bill pay, transaction history with search, CSV export and print
+- 4-digit transaction PIN (5 wrong tries locks it for 5 minutes), password change
+- Debit cards: request virtual (free, instant) or physical (Standard free, Premier $15 expedited, with delivery tracking), activate, freeze, spend limit, show details, cancel
+- "Add money" button adds demo test funds only
+
+## Files
+`index.html signup.html login.html dashboard.html styles.css bank.css app.js bank.js vercel.json`
+
 ## Deploy to Vercel
-1. Put all files in one folder and push it to a GitHub repo.
-2. On vercel.com choose **Add New > Project**, import the repo.
-3. Framework preset: **Other**. Leave build command and output directory empty. Deploy.
+1. Put all files in one folder and push it to a GitHub repo (or run `vercel` in the folder).
+2. On vercel.com choose **Add New > Project**, import the repo, framework preset **Other**, no build command. Deploy.
 
-Or with the CLI: `npm i -g vercel`, then run `vercel` in the folder.
-
-## Notes
-- Accounts are stored in the browser's localStorage, so users are only visible on their own device. This is a demo.
-- Before real users or money: add a backend (e.g. Vercel Functions plus a database such as Postgres), server-side password hashing (bcrypt/argon2), sessions or JWTs, and server-side account number uniqueness.
-- Handling real money also requires regulatory licensing and a banking partner.
+## Important
+- Everything is stored in the browser's localStorage. Users only exist on their own device, so a transfer only works between accounts created in the same browser.
+- Card numbers and the routing number (999000014) are fictional and cannot be used for real payments.
+- Before real users or money: move auth, balances, transfers and cards to a server-side backend and database (e.g. Vercel Functions plus Postgres), hash passwords/PINs server-side, and partner with a chartered, FDIC-insured bank and a card issuer (BaaS) with KYC/AML compliance. Do not collect SSNs or real card data in this demo.

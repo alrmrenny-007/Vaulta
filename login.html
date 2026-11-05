@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Log in | Vaulta</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="auth-wrap">
+  <aside class="auth-side">
+    <a class="logo" href="/">Vault<span>a</span></a>
+    <div>
+      <h2>Welcome back.</h2>
+      <p>Log in with your email or your account number.</p>
+    </div>
+    <small style="color:var(--muted)">Demo project. No real money is held.</small>
+  </aside>
+
+  <main class="auth-main">
+    <form class="card" id="loginForm" novalidate>
+      <h1>Log in</h1>
+      <p class="sub">Enter your details to continue.</p>
+      <div id="alert" class="alert"></div>
+
+      <div class="field">
+        <label for="id">Email or account number</label>
+        <input class="input" id="id" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label for="pw">Password</label>
+        <div class="pw-wrap"><input class="input" id="pw" type="password" autocomplete="current-password" required><button type="button" onclick="togglePw(this)">SHOW</button></div>
+      </div>
+
+      <button class="btn btn-primary btn-block" type="submit">Log in</button>
+      <p class="switch">New to Vaulta? <a href="signup.html">Create an account</a></p>
+    </form>
+  </main>
+</div>
+
+<script src="app.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+if (Store.currentUser()) location.href = 'dashboard.html';
+
+$('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const alertEl = $('alert');
+  const idv = $('id').value.trim().toLowerCase();
+  const pw = $('pw').value;
+  if (!idv || !pw) return showAlert(alertEl, 'err', 'Enter your email/account number and password.');
+
+  const user = Store.users().find(u => u.email === idv || u.accountNumber === idv);
+  const bad = 'Incorrect details. Please try again.';
+  if (!user) return showAlert(alertEl, 'err', bad);
+  const h = await hashPassword(pw, user.salt);
+  if (h !== user.passwordHash) return showAlert(alertEl, 'err', bad);
+
+  Store.setSession(user.id);
+  showAlert(alertEl, 'ok', 'Welcome back! Redirecting...');
+  setTimeout(() => location.href = 'dashboard.html', 500);
+});
+</script>
+</body>
+</html>

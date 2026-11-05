@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dashboard | Vaulta</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="container">
+  <div class="dash-top">
+    <a class="logo" href="/">Vault<span>a</span></a>
+    <button class="btn btn-sm" id="logout">Log out</button>
+  </div>
+
+  <h1 id="hello" style="margin:10px 0 24px;letter-spacing:-.5px"></h1>
+
+  <div class="grid">
+    <div>
+      <div class="bank-card" id="card">
+        <div>
+          <div class="label" id="nick"></div>
+          <div class="label">Account number</div>
+        </div>
+        <div class="num" id="num"></div>
+        <div style="display:flex;justify-content:space-between;align-items:end">
+          <div><div class="label">Balance</div><div class="bal">₦0.00</div></div>
+          <button class="btn btn-sm" id="copy" style="color:#fff;border-color:rgba(255,255,255,.5)">Copy number</button>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:20px">
+        <h3>Recent activity</h3>
+        <div class="empty">No transactions yet.</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <h3>Customize account</h3>
+        <div id="alert" class="alert"></div>
+        <div class="field">
+          <label for="newAcct">Account number</label>
+          <input class="input acct-input" id="newAcct" inputmode="numeric" maxlength="10" style="font-size:1.1rem">
+          <div class="hint" id="hint"></div>
+        </div>
+        <div class="field">
+          <label for="newNick">Nickname</label>
+          <input class="input" id="newNick" maxlength="30">
+        </div>
+        <div class="field">
+          <label>Card colour</label>
+          <div class="themes" id="themes"></div>
+        </div>
+        <button class="btn btn-primary btn-block" id="save">Save changes</button>
+      </div>
+
+      <div class="panel" style="margin-top:20px">
+        <h3>Profile</h3>
+        <div class="stat"><span>Name</span><span id="pName"></span></div>
+        <div class="stat"><span>Email</span><span id="pEmail"></span></div>
+        <div class="stat"><span>Phone</span><span id="pPhone"></span></div>
+        <div class="stat"><span>Joined</span><span id="pJoined"></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const user = Store.currentUser();
+if (!user) location.replace('login.html');
+let theme = user.theme;
+
+function render() {
+  const u = Store.currentUser();
+  $('hello').textContent = 'Hi, ' + u.name.split(' ')[0] + ' 👋';
+  $('card').style.background = THEMES[u.theme] || THEMES.emerald;
+  $('nick').textContent = u.nickname;
+  $('num').textContent = Account.format(u.accountNumber);
+  $('pName').textContent = u.name; $('pEmail').textContent = u.email; $('pPhone').textContent = u.phone;
+  $('pJoined').textContent = new Date(u.createdAt).toLocaleDateString();
+}
+render();
+$('newAcct').value = user.accountNumber;
+$('newNick').value = user.nickname;
+
+function drawThemes() {
+  $('themes').innerHTML = '';
+  Object.entries(THEMES).forEach(([key, bg]) => {
+    const d = document.createElement('div');
+    d.className = 'theme-dot' + (key === theme ? ' active' : '');
+    d.style.background = bg; d.title = key;
+    d.onclick = () => { theme = key; drawThemes(); };
+    $('themes').appendChild(d);
+  });
+}
+drawThemes();
+
+$('newAcct').addEventListener('input', e => {
+  e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10);
+  const r = Account.check(e.target.value, user.id);
+  $('hint').textContent = r.msg; $('hint').className = 'hint ' + (r.ok ? 'ok' : 'err');
+});
+
+$('save').onclick = () => {
+  const n = $('newAcct').value;
+  const r = Account.check(n, user.id);
+  if (!r.ok) return showAlert($('alert'), 'err', r.msg);
+  Store.updateUser(user.id, { accountNumber: n, nickname: $('newNick').value.trim() || 'Main Account', theme });
+  render();
+  showAlert($('alert'), 'ok', 'Saved.');
+};
+
+$('copy').onclick = async () => {
+  const u = Store.currentUser();
+  try { await navigator.clipboard.writeText(u.accountNumber); $('copy').textContent = 'Copied!'; }
+  catch { $('copy').textContent = u.accountNumber; }
+  setTimeout(() => $('copy').textContent = 'Copy number', 1500);
+};
+
+$('logout').onclick = () => { Store.clearSession(); location.href = 'login.html'; };
+</script>
+</body>
+</html>

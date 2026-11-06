@@ -10,9 +10,9 @@ const Bank = (() => {
   const MAX_CARDS = 3;
 
   const TIERS = {
-    virtual:  { label: 'Virtual',  fee: 0,    physical: false, bg: 'linear-gradient(135deg,#0d7a56,#18b4ff)', note: 'Free. Instant. For online and in-app payments.' },
-    standard: { label: 'Standard', fee: 0,    physical: true,  bg: 'linear-gradient(135deg,#1c2538,#3e4e70)', note: 'Free. Arrives in 7-10 business days.' },
-    platinum: { label: 'Premier',  fee: 1500, physical: true,  bg: 'linear-gradient(135deg,#2a2210,#c09a45)', note: '$15 expedited. Arrives in 3-5 business days.' }
+    virtual:  { label: 'Virtual',  fee: 1000, physical: false, bg: 'linear-gradient(135deg,#0d7a56,#18b4ff)', note: 'Instant. For online and in-app payments.' },
+    standard: { label: 'Standard', fee: 2500, physical: true,  bg: 'linear-gradient(135deg,#1c2538,#3e4e70)', note: 'Physical card. Arrives in 7-10 business days.' },
+    platinum: { label: 'Premier',  fee: 5000, physical: true,  bg: 'linear-gradient(135deg,#2a2210,#c09a45)', note: 'Premium design. Expedited, 3-5 business days.' }
   };
   const STAGES = ['requested', 'processing', 'shipped', 'delivered', 'active'];
   const STAGE_LABEL = { requested: 'Requested', processing: 'Processing', shipped: 'On the way', delivered: 'Delivered', active: 'Active' };
@@ -117,11 +117,14 @@ const Bank = (() => {
   }
 
   // Demo funding so the features can be tried. Not real money.
-  function fund(id, amount) {
+  // src: { narration, name } describes where the money "came from".
+  function fund(id, amount, src) {
     if (!Number.isInteger(amount) || amount < 100) return fail('Enter a valid amount.');
-    if (amount > MAX_TOPUP) return fail(`Demo top-ups are limited to ${fmt(MAX_TOPUP)} each.`);
+    if (amount > MAX_TOPUP) return fail(`Demo deposits are limited to ${fmt(MAX_TOPUP)} each.`);
     const u = get(id);
-    const tx = addTx(u, { type: 'credit', category: 'deposit', amount, narration: 'Demo top-up', counterparty: { name: 'Demo funds', acct: '' } });
+    const narration = String((src && src.narration) || 'Demo deposit').slice(0, 60);
+    const name = String((src && src.name) || 'Demo funds').slice(0, 40);
+    const tx = addTx(u, { type: 'credit', category: 'deposit', amount, narration, counterparty: { name, acct: '' } });
     save(u);
     return { ok: true, tx };
   }
@@ -174,7 +177,7 @@ const Bank = (() => {
       if (!/^\d{5}$/.test((o.zip || '').trim())) return fail('Enter a 5-digit ZIP code.');
       if ((o.phone || '').replace(/\D/g, '').length < 10) return fail('Enter a valid 10-digit phone number.');
     }
-    if (tier.fee > u.balance) return fail(`Insufficient balance. This card costs ${fmt(tier.fee)}.`);
+    if (tier.fee > u.balance) return fail(`Insufficient balance. This card has a ${fmt(tier.fee)} issuance fee. Add money first.`);
 
     const exp = new Date(); exp.setFullYear(exp.getFullYear() + 4);
     const card = {
@@ -193,7 +196,7 @@ const Bank = (() => {
     };
     u.cards.push(card);
     let tx = null;
-    if (tier.fee > 0) tx = addTx(u, { type: 'debit', category: 'fee', amount: tier.fee, narration: `${tier.label} debit card fee`, counterparty: { name: 'Vaulta', acct: '' } });
+    if (tier.fee > 0) tx = addTx(u, { type: 'debit', category: 'fee', amount: tier.fee, narration: `${tier.label} debit card issuance fee`, counterparty: { name: 'Vaulta', acct: '' } });
     save(u);
     return { ok: true, card, tx };
   }

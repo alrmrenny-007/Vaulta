@@ -119,3 +119,57 @@ select.input{appearance:none}
 .method .ic{font-size:1.5rem}
 .method b{display:block}
 .method small{display:block;color:var(--muted);font-size:.8rem;margin-top:2px}
+
+/* ===================== Dashboard motion ===================== */
+.bank-card,.vcard{transition:transform .2s ease-out,box-shadow .3s;background-size:220% 220%!important;animation:gradShift 12s ease infinite;will-change:transform}
+.bank-card::after{animation:drift 10s ease-in-out infinite}
+.vcard::after{animation:drift 12s ease-in-out infinite}
+.bank-card:hover{box-shadow:0 26px 60px rgba(0,0,0,.5)}
+.vc-num{font-size:clamp(.95rem,4.3vw,1.2rem);letter-spacing:2px;white-space:nowrap}
+.wave{display:inline-block;transform-origin:70% 75%;animation:wave 2.6s 1s ease-in-out infinite}
+
+/* page + element entrance (backwards fill so tilt transforms still work afterwards) */
+#view>*{animation:rise .55s cubic-bezier(.2,.8,.2,1) backwards}
+#view>*:nth-child(2){animation-delay:.06s}#view>*:nth-child(3){animation-delay:.12s}
+#view>*:nth-child(4){animation-delay:.18s}#view>*:nth-child(5){animation-delay:.24s}#view>*:nth-child(n+6){animation-delay:.3s}
+#view.noanim>*,#view.noanim .tx,#view.noanim .card-block,.quiet .tx{animation:none}
+.tx{animation:rise .5s backwards;transition:background .2s,transform .2s,padding .2s}
+.tx:hover{background:var(--surface2);transform:translateX(4px);border-radius:12px;padding-left:8px;padding-right:8px}
+.tx:nth-child(2){animation-delay:.18s}.tx:nth-child(3){animation-delay:.24s}.tx:nth-child(4){animation-delay:.3s}
+.tx:nth-child(5){animation-delay:.36s}.tx:nth-child(6){animation-delay:.42s}.tx:nth-child(n+7){animation-delay:.48s}
+.tx-ic{transition:transform .3s cubic-bezier(.3,1.8,.5,1)}
+.tx:hover .tx-ic{transform:scale(1.15) rotate(-6deg)}
+.card-block{animation:rise .6s backwards}
+
+/* interactive bits */
+.quick button{transition:transform .25s cubic-bezier(.3,1.6,.5,1),border-color .2s,box-shadow .25s,background .2s}
+.quick button:hover{transform:translateY(-5px);box-shadow:0 14px 30px rgba(0,0,0,.35);background:var(--surface2)}
+.quick button:active{transform:scale(.94)}
+.quick .ic{display:inline-block;transition:transform .35s cubic-bezier(.3,1.8,.5,1)}
+.quick button:hover .ic{transform:scale(1.3) rotate(-8deg)}
+.side-link{transition:background .2s,color .2s,transform .2s}
+.side-link:hover{transform:translateX(5px)}
+.side-link.active{box-shadow:inset 3px 0 0 var(--accent)}
+.bottom-nav button{transition:color .2s}
+.bottom-nav button span{transition:transform .3s cubic-bezier(.3,1.8,.5,1)}
+.bottom-nav button.active span{transform:translateY(-3px) scale(1.2)}
+.method{transition:transform .2s,border-color .2s,background .2s}
+.method:hover{transform:translateX(5px)}
+.pill{transition:transform .2s,border-color .2s,background .2s}
+.pill:hover{transform:translateY(-2px)}
+.panel{transition:border-color .3s}
+.panel:hover{border-color:#2d3c56}
+.step.done i{animation:pop .5s backwards}
+.step.done:last-of-type i{box-shadow:0 0 0 4px rgba(46,229,157,.2)}
+
+/* modal, toast, receipt */
+.overlay{animation:fadeIn .2s both}
+.modal{animation:pop .35s cubic-bezier(.2,1.3,.4,1) both}
+.toast{animation:toastIn .4s cubic-bezier(.2,1.3,.4,1) both}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,24px) scale(.9)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
+.tick{animation:pop .5s cubic-bezier(.2,1.6,.4,1) both;position:relative}
+.tick::after{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid var(--accent);animation:ripple 1.2s .3s ease-out}
+@keyframes ripple{from{opacity:.8;transform:scale(1)}to{opacity:0;transform:scale(1.9)}}
+.tick-path{stroke-dasharray:26;stroke-dashoffset:26;animation:drawTick .5s .25s ease-out forwards}
+@keyframes drawTick{to{stroke-dashoffset:0}}
+.receipt-top .big{animation:rise .6s .15s backwards}

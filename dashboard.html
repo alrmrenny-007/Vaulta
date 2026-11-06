@@ -4,10 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Dashboard | Vaulta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="bank.css">
 </head>
 <body>
+<div class="blobs"><i></i><i></i><i></i></div>
 <div class="app-shell">
   <aside class="sidebar" id="sidebar"></aside>
   <main class="main" id="view"></main>
@@ -27,6 +31,7 @@ let me = Bank.me();
 if (!me) location.replace('login.html');
 const refresh = () => { me = Bank.me(); if (!me) location.replace('login.html'); };
 
+let lastShown = null;
 let route = 'home', hideBal = false, tTab = 'send', hFilter = 'all', hQuery = '';
 
 const NAV = [
@@ -129,7 +134,7 @@ function txRow(t) {
 }
 function receipt(t) {
   const cr = t.type === 'credit';
-  modal(`<div class="receipt-top"><div class="tick">✓</div><div class="big">${cr ? '+' : '-'}${fmt(t.amount)}</div><div class="muted">${esc(t.status)}</div></div>
+  modal(`<div class="receipt-top"><div class="tick"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path class="tick-path" d="M5 13l4 4L19 7"/></svg></div><div class="big">${cr ? '+' : '-'}${fmt(t.amount)}</div><div class="muted">${esc(t.status)}</div></div>
     <div class="stat"><span>${cr ? 'From' : 'To'}</span><b>${esc(t.counterparty.name)}</b></div>
     ${t.counterparty.acct && t.category === 'transfer' ? `<div class="stat"><span>Account</span><b>${esc(t.counterparty.acct)}</b></div>` : ''}
     <div class="stat"><span>Type</span><b>${esc(t.category)}</b></div>
@@ -144,10 +149,10 @@ function receipt(t) {
 function viewHome() {
   const rec = me.transactions.slice(0, 5);
   const live = me.cards.filter(c => c.status !== 'cancelled');
-  return `<h1 class="page-title">Hi, ${esc(me.name.split(' ')[0])} 👋</h1>
-  <div class="bank-card" style="background:${THEMES[me.theme] || THEMES.emerald}">
+  return `<h1 class="page-title">Hi, ${esc(me.name.split(' ')[0])} <span class="wave">👋</span></h1>
+  <div class="bank-card" data-tilt style="background:${THEMES[me.theme] || THEMES.emerald}">
     <div><div class="label">${esc(me.nickname)}</div><div class="label">Available balance</div></div>
-    <div class="bal-big">${hideBal ? '$ ••••••' : fmt(me.balance)}</div>
+    <div class="bal-big" id="balBig">${hideBal ? '$ ••••••' : fmt(me.balance)}</div>
     <div class="card-foot">
       <div><div class="label">Checking · Routing ${Bank.ROUTING}</div><div class="num-sm">${esc(me.accountNumber)}</div></div>
       <div class="row-btns"><button class="btn btn-sm glass" data-act="toggleBal">${hideBal ? 'Show' : 'Hide'}</button><button class="btn btn-sm glass" data-act="copyAcct">Copy</button></div>
@@ -160,7 +165,7 @@ function viewHome() {
     <button data-go="cardreq"><span class="ic">💳</span>Get a card</button>
   </div>
   ${live.length ? '' : `<div class="panel" style="margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-    <div><b>Request your debit card</b><div class="muted small">Virtual cards are free and instant.</div></div><button class="btn btn-primary btn-sm" data-go="cardreq">Request card</button></div>`}
+    <div><b>Request your debit card</b><div class="muted small">Cards start at $10. Virtual cards are instant.</div></div><button class="btn btn-primary btn-sm" data-go="cardreq">Request card</button></div>`}
   <div class="panel"><div class="panel-head"><h3>Recent activity</h3><button class="link-btn" data-go="history">See all</button></div>
     ${rec.length ? rec.map(txRow).join('') : '<div class="empty">No transactions yet. Use Add money to get started.</div>'}</div>`;
 }
@@ -194,7 +199,7 @@ function trackHtml(c) {
 function cardVisual(c) {
   const t = Bank.TIERS[c.tier];
   const pending = c.kind === 'physical' && c.status !== 'active';
-  return `<div class="vcard" style="background:${t.bg}">
+  return `<div class="vcard" data-tilt style="background:${t.bg}">
     <div class="vc-top"><b>Vaulta</b><span class="badge">${c.kind === 'virtual' ? 'VIRTUAL' : esc(t.label.toUpperCase())}</span></div>
     <div class="vc-chip"></div>
     <div class="vc-num">${c.number.slice(0, 4)} •••• •••• ${c.number.slice(-4)}</div>
@@ -228,7 +233,7 @@ function viewCardReq() {
   <form class="panel" id="cardForm">
     <label class="lbl">Choose a card</label>
     <div class="tier-grid">${Object.entries(Bank.TIERS).map(([k, t], i) => `<label class="tier"><input type="radio" name="tier" value="${k}" ${i === 0 ? 'checked' : ''}>
-      <div class="tier-in"><div class="mini" style="background:${t.bg}"></div><b>${t.label}</b><small>${t.fee ? fmt(t.fee) : 'Free'}</small><small class="muted">${esc(t.note)}</small></div></label>`).join('')}</div>
+      <div class="tier-in"><div class="mini" style="background:${t.bg}"></div><b>${t.label}</b><small><b>${fmt(t.fee)}</b> one-time fee</small><small class="muted">${esc(t.note)}</small></div></label>`).join('')}</div>
     <div class="field"><label>Name on card</label><input class="input" id="cName" maxlength="22" value="${esc(me.name.toUpperCase().slice(0, 22))}"></div>
     <div id="shipBox" style="display:none">
       <div class="field"><label>Street address</label><input class="input" id="cAddr" placeholder="123 Main St" autocomplete="address-line1"></div>
@@ -256,8 +261,9 @@ function viewHistory() {
     <button class="btn btn-sm" data-act="csv">Export CSV</button><button class="btn btn-sm" data-act="print">Print</button></div>
   <div class="panel" id="histList"></div>`;
 }
-function drawHist() {
+function drawHist(quiet) {
   const list = filteredTx();
+  $('#histList').classList.toggle('quiet', !!quiet);
   $('#histList').innerHTML = list.length ? list.map(txRow).join('') : '<div class="empty">No transactions found.</div>';
 }
 
@@ -342,7 +348,7 @@ const wire = {
     const upd = () => {
       const tier = $('input[name=tier]:checked').value, t = Bank.TIERS[tier];
       $('#shipBox').style.display = t.physical ? 'block' : 'none';
-      $('#feeOut').textContent = t.fee ? fmt(t.fee) : 'Free';
+      $('#feeOut').textContent = fmt(t.fee) + ' (one-time)';
     };
     $$('input[name=tier]').forEach(r => r.addEventListener('change', upd)); upd();
     digitsOnly($('#cPhone')); digitsOnly($('#cZip'));
@@ -350,8 +356,8 @@ const wire = {
       e.preventDefault();
       const tier = $('input[name=tier]:checked').value, t = Bank.TIERS[tier];
       const o = { tier, nameOnCard: $('#cName').value, address: $('#cAddr').value, apt: $('#cApt').value, city: $('#cCity').value, state: $('#cState').value, zip: $('#cZip').value, phone: $('#cPhone').value };
-      if (t.fee > me.balance) return toast(`Insufficient balance. This card costs ${fmt(t.fee)}.`, 'err');
-      const rows = [['Card', t.label + (t.physical ? ' (physical)' : ' (virtual)')], ['Name', o.nameOnCard.toUpperCase()], ['Fee', t.fee ? fmt(t.fee) : 'Free']];
+      if (t.fee > me.balance) return toast(`Insufficient balance. This card has a ${fmt(t.fee)} fee. Add money first.`, 'err');
+      const rows = [['Card', t.label + (t.physical ? ' (physical)' : ' (virtual)')], ['Name', o.nameOnCard.toUpperCase()], ['Issuance fee', fmt(t.fee)]];
       if (t.physical) rows.push(['Deliver to', `${o.address}${o.apt ? ', ' + o.apt : ''}, ${o.city}, ${o.state} ${o.zip}`]);
       if (!await confirmModal('Confirm card request', rows, 'Continue')) return;
       const pin = await askPin(); if (!pin) return;
@@ -362,7 +368,7 @@ const wire = {
   },
   history() {
     drawHist();
-    $('#hSearch').addEventListener('input', e => { hQuery = e.target.value; drawHist(); });
+    $('#hSearch').addEventListener('input', e => { hQuery = e.target.value; drawHist(true); });
   },
   settings() {
     digitsOnly($('#stAcct'));
@@ -509,7 +515,7 @@ const acts = {
     refresh(); toast('Limit saved'); show('cards');
   },
   async cancelCard(el) {
-    if (!await confirmModal('Cancel this card?', [['Note', 'This cannot be undone. Fees are not refunded.']], 'Cancel card')) return;
+    if (!await confirmModal('Cancel this card?', [['Note', 'This cannot be undone. The issuance fee is not refunded.']], 'Cancel card')) return;
     const r = Bank.cancelCard(me.id, el.dataset.id); if (!r.ok) return toast(r.msg, 'err');
     refresh(); toast('Card cancelled'); show('cards');
   },
@@ -543,10 +549,18 @@ function show(r) {
   if (location.hash !== '#' + route) history.replaceState(null, '', '#' + route);
   refresh();
   if (!me) return;
-  $('#view').innerHTML = VIEWS[route]();
+  const changed = route !== lastShown; lastShown = route;
+  const v = $('#view');
+  v.classList.toggle('noanim', !changed);
+  v.innerHTML = VIEWS[route]();
   if (wire[route]) wire[route]();
   renderNav();
-  window.scrollTo(0, 0);
+  FX.tilt(v);
+  if (changed) {
+    window.scrollTo(0, 0);
+    const b = $('#balBig');
+    if (b && route === 'home' && !hideBal) FX.countUp(b, me.balance, fmt);
+  }
 }
 window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (h !== route && VIEWS[h]) show(h); });
 show(location.hash.slice(1) || 'home');

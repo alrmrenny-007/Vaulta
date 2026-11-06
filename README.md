@@ -7,7 +7,7 @@ Static site: HTML, CSS and JS. Pages: `index`, `signup`, `login`, `dashboard`.
 - Login with email or account number
 - Dashboard: balance, send money to other Vaulta accounts, saved beneficiaries, bill pay, transaction history with search, CSV export and print
 - 4-digit transaction PIN (5 wrong tries locks it for 5 minutes), password change
-- Debit cards: request virtual (free, instant) or physical (Standard free, Premier $15 expedited, with delivery tracking), activate, freeze, spend limit, show details, cancel
+- Debit cards: request Virtual ($10, instant), Standard ($25) or Premier ($50, expedited) cards with a one-time issuance fee and delivery tracking, activate, freeze, spend limit, show details, cancel
 - Add money (demo only, no real money): ACH bank transfer, debit card, mobile check deposit, or direct deposit details
 
 ## Files

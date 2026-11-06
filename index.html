@@ -4,10 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Vaulta | Banking that's yours</title>
-<meta name="description" content="Open a Vaulta account in minutes and pick your own account number.">
+<meta name="description" content="Open a Vaulta checking account in minutes and pick your own account number.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<noscript><style>.reveal{opacity:1;transform:none}</style></noscript>
 </head>
 <body>
+<div class="blobs"><i></i><i></i><i></i></div>
+
 <div class="container">
   <nav class="nav">
     <a class="logo" href="/">Vault<span>a</span></a>
@@ -17,21 +23,68 @@
     </div>
   </nav>
 
-  <section class="hero">
-    <h1>Banking with an account number <em>you choose</em></h1>
-    <p>Open a Vaulta checking account in under two minutes. Pick your own account number, get a routing number, and request your debit card.</p>
-    <div class="actions">
-      <a class="btn btn-primary" href="signup.html">Open an account</a>
-      <a class="btn" href="login.html">I already have one</a>
+  <section class="hero2">
+    <div>
+      <div class="tag"><i></i> Demo bank · nothing here is real money</div>
+      <h1>Banking with an account number <em>you choose</em></h1>
+      <p>Open a Vaulta checking account in under two minutes. Pick your own account number, get a routing number, and request your debit card.</p>
+      <div class="actions">
+        <a class="btn btn-primary" href="signup.html">Open an account</a>
+        <a class="btn" href="login.html">I already have one</a>
+      </div>
+      <div class="trust"><span>No monthly fees</span><span>Cards from $10</span><span>Instant setup</span></div>
+    </div>
+
+    <div class="hero-visual">
+      <div class="float-wrap">
+        <div class="float-card" data-tilt>
+          <div class="fc-top"><b>Vault<span>a</span></b><span class="badge">CHECKING</span></div>
+          <div class="fc-chip"></div>
+          <div class="fc-num" id="liveNum">7584292882</div>
+          <div class="fc-bot"><div><small>ROUTING</small>999000014</div><div><small>ACCOUNT NUMBER</small>You pick it</div></div>
+        </div>
+      </div>
+      <div class="notif n1"><span class="ni">🔢</span><div><b>Number reserved</b><small>Your pick, your account</small></div></div>
+      <div class="notif n2"><span class="ni">💳</span><div><b>Virtual card ready</b><small>Instant, from $10</small></div></div>
+      <div class="notif n3"><span class="ni">⚡</span><div><b>Transfer sent</b><small>Confirmed with your PIN</small></div></div>
     </div>
   </section>
 
   <section class="features">
-    <div class="feature"><div class="icon">🔢</div><h3>Custom account number</h3><p>Use your phone number, a lucky number, or let us generate one for you.</p></div>
-    <div class="feature"><div class="icon">🎨</div><h3>Personal style</h3><p>Name your account and pick a card colour that matches you.</p></div>
-    <div class="feature"><div class="icon">⚡</div><h3>Instant setup</h3><p>Sign up and see your dashboard right away. No paperwork.</p></div>
+    <div class="feature reveal"><div class="icon">🔢</div><h3>Custom account number</h3><p>Use your phone number, a lucky number, or let us generate one for you.</p></div>
+    <div class="feature reveal" style="--d:.1s"><div class="icon">💳</div><h3>Debit cards</h3><p>Get a virtual card instantly, or order a physical card and track its delivery. Cards from $10.</p></div>
+    <div class="feature reveal" style="--d:.2s"><div class="icon">💸</div><h3>Send and pay</h3><p>Send money to other accounts, pay bills, and keep every receipt in your history.</p></div>
+  </section>
+
+  <h2 class="section-title reveal">Up and running in three steps</h2>
+  <p class="section-sub reveal">No paperwork. No waiting in line.</p>
+  <section class="steps">
+    <div class="step-card reveal"><h3>Sign up</h3><p>Your name, email and a password. That's it.</p></div>
+    <div class="step-card reveal" style="--d:.12s"><h3>Pick your number</h3><p>Choose any 8 to 12 digits, or tap generate for a fresh one.</p></div>
+    <div class="step-card reveal" style="--d:.24s"><h3>Request your card</h3><p>Virtual cards are ready instantly (from $10). Physical cards ship to your door.</p></div>
+  </section>
+
+  <section class="cta reveal">
+    <h2>Ready to make it yours?</h2>
+    <p>Create your account and choose your number today.</p>
+    <a class="btn btn-primary" href="signup.html">Get started</a>
   </section>
 </div>
 <footer>&copy; 2026 Vaulta. Demo project. Not a bank. Not FDIC insured. No real money is held.</footer>
+
+<script src="app.js"></script>
+<script>
+FX.reveal(document);
+FX.tilt(document);
+document.querySelectorAll('.feature').forEach(f => f.addEventListener('pointermove', e => {
+  const r = f.getBoundingClientRect();
+  f.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100) + '%');
+  f.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100) + '%');
+}));
+// the hero card keeps "picking" new account numbers
+const live = document.getElementById('liveNum');
+const rand = () => String(1 + Math.floor(Math.random() * 9)) + Array.from({ length: 9 }, () => Math.floor(Math.random() * 10)).join('');
+setInterval(() => FX.scramble(live, rand()), 3600);
+</script>
 </body>
 </html>

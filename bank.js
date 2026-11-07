@@ -5,7 +5,7 @@ const Bank = (() => {
   const B = {
     ROUTING: '999000014',
     DAILY_LIMIT: 50000000,
-    MAX_TOPUP: 500000,
+    MAX_TOPUP: 50000000,
     MAX_CARDS: 3,
     BILL_CATEGORIES: ['Electric', 'Gas & Water', 'Internet & Cable', 'Mobile Phone', 'Credit Card', 'Rent & Other'],
     STATES: 'AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY'.split(' '),

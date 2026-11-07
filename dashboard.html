@@ -221,7 +221,7 @@ function cardBlock(c) {
     <button class="btn btn-sm" data-act="limit" data-id="${c.id}">Spend limit</button>
     <button class="btn btn-sm btn-danger" data-act="cancelCard" data-id="${c.id}">Cancel card</button>`;
   else if (c.status === 'delivered') acts = `<button class="btn btn-sm btn-primary" data-act="activate" data-id="${c.id}">Activate card</button>`;
-  else acts = `<button class="btn btn-sm" data-act="advance" data-id="${c.id}">Demo: next delivery stage</button>
+  else acts = `<button class="btn btn-sm" data-act="advance" data-id="${c.id}">Next delivery stage</button>
     <button class="btn btn-sm btn-danger" data-act="cancelCard" data-id="${c.id}">Cancel request</button>`;
   return `<div class="card-block">${cardVisual(c)}<div>
     <h3>${esc(t.label)} ${c.kind === 'virtual' ? '' : c.kind + ' '}card</h3>
@@ -232,7 +232,7 @@ function viewCards() {
   const cards = me.cards.filter(c => c.status !== 'cancelled');
   return `<div class="panel-head"><h1 class="page-title" style="margin:0">Your cards</h1><button class="btn btn-primary btn-sm" data-go="cardreq">+ Request card</button></div>
     <div class="panel">${cards.length ? cards.map(cardBlock).join('') : '<div class="empty">You have no cards yet.<br><br><button class="btn btn-primary" data-go="cardreq">Request your debit card</button></div>'}</div>
-    <p class="muted small" style="margin-top:12px">Demo cards use fictional numbers and cannot be used for real payments.</p>`;
+    `;
 }
 function viewCardReq() {
   return `<button class="btn btn-sm" data-go="cards">← Back</button>
@@ -281,7 +281,7 @@ function viewSettings() {
     <div class="stat"><span>Account type</span><b>Checking</b></div>
     <div class="stat"><span>Routing number</span><b>${Bank.ROUTING}</b></div>
     <div class="stat"><span>Account number</span><b>${esc(me.accountNumber)}</b></div>
-    <p class="muted small" style="margin-top:10px">Demo numbers. This is not a real bank account.</p></div>
+    </div>
   <form class="panel" id="profForm"><h3 class="sec-title">Profile</h3>
     <div class="field"><label>Full name</label><input class="input" id="stName" value="${esc(me.name)}"></div>
     <div class="row"><div class="field"><label>Email</label><input class="input" value="${esc(me.email)}" disabled></div>
@@ -447,13 +447,13 @@ const wire = {
 
 
 const ADD_METHODS = {
-  bank: { icon: '🏦', title: 'Transfer from a bank account', sub: 'ACH from another bank. Usually 1-3 business days (instant in this demo).',
-    fields: [{ id: 'bn', label: 'Bank name', ph: 'e.g. First Demo Bank', max: 30, err: 'Enter the bank name' }, { id: 'l4', label: 'Account ending in (last 4 digits)', ph: '1234', max: 4, digits: true, err: 'Enter the last 4 digits' }],
+  bank: { icon: '🏦', title: 'Transfer from a bank account', sub: 'ACH from another bank. Usually 1-3 business days (instant here).',
+    fields: [{ id: 'bn', label: 'Bank name', ph: 'e.g. Lakeside Bank', max: 30, err: 'Enter the bank name' }, { id: 'l4', label: 'Account ending in (last 4 digits)', ph: '1234', max: 4, digits: true, err: 'Enter the last 4 digits' }],
     body: f => ({ method: 'bank', bankName: f.bn, last4: f.l4 }) },
   card: { icon: '💳', title: 'Add with a debit card', sub: 'Instant top-up from a debit card you own.',
     fields: [{ id: 'l4', label: 'Debit card ending in (last 4 digits)', ph: '1234', max: 4, digits: true, err: 'Enter the last 4 digits' }],
     body: f => ({ method: 'card', last4: f.l4 }) },
-  check: { icon: '📷', title: 'Mobile check deposit', sub: 'Deposit a paper check. Funds usually clear in 1-2 business days (instant in this demo).',
+  check: { icon: '📷', title: 'Mobile check deposit', sub: 'Deposit a paper check. Funds usually clear in 1-2 business days (instant here).',
     fields: [{ id: 'cn', label: 'Check number', ph: '1042', max: 4, digits: true, err: 'Enter the 4-digit check number' }],
     body: f => ({ method: 'check', checkNumber: f.cn }) },
   dd: { icon: '🏢', title: 'Set up direct deposit', sub: 'Get your routing and account number to give your employer.' }
@@ -464,7 +464,7 @@ function directDeposit() {
     <div class="stat"><span>Routing number</span><b>${Bank.ROUTING}</b></div>
     <div class="stat"><span>Account number</span><b>${esc(me.accountNumber)}</b></div>
     <div class="stat"><span>Account holder</span><b>${esc(me.name)}</b></div>
-    <p class="muted small" style="margin-top:12px">Give these to your employer or payer. These are demo numbers, so nothing will actually arrive.</p>
+    <p class="muted small" style="margin-top:12px">Give these to your employer or payer.</p>
     <div class="modal-actions"><button class="btn" data-act="copyDD">Copy details</button><button class="btn btn-primary" data-act="closeModal">Done</button></div>`);
 }
 
@@ -503,7 +503,7 @@ const acts = {
   async logout() { await API.post('/auth/logout'); location.href = 'login.html'; },
   async addMoney() {
     const k = await promptModal(
-      `<h3>Add money</h3><p class="muted small" style="margin-bottom:14px">Demo only. No real money moves.</p>
+      `<h3>Add money</h3>
        ${Object.entries(ADD_METHODS).map(([key, m]) => `<button class="method" data-m="${key}"><span class="ic">${m.icon}</span><span><b>${esc(m.title)}</b><small>${esc(m.sub)}</small></span></button>`).join('')}
        <div class="modal-actions"><button class="btn" data-cancel>Cancel</button></div>`,
       (m, done) => { $$('.method', m).forEach(b => b.onclick = () => done(b.dataset.m)); });
@@ -540,7 +540,7 @@ const acts = {
     if (!r.ok) return toast(r.msg, 'err');
     modal(`<h3>Card details</h3><div class="stat"><span>Number</span><b>${r.number.replace(/(\d{4})(?=\d)/g, '$1 ')}</b></div>
       <div class="stat"><span>Expiry</span><b>${esc(r.expiry)}</b></div><div class="stat"><span>CVV</span><b>${esc(r.cvv)}</b></div>
-      <p class="muted small" style="margin-top:10px">Demo card. Fictional number.</p>
+      
       <div class="modal-actions"><button class="btn btn-primary" data-act="closeModal">Close</button></div>`);
   },
   async freeze(el) { const r = await Bank.toggleFreeze(me.id, el.dataset.id); if (!r.ok) return toast(r.msg, 'err'); await refresh(); toast(r.card.frozen ? 'Card frozen' : 'Card unfrozen'); show('cards'); },

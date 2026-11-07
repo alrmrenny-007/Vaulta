@@ -10,8 +10,8 @@ const MIN = 60 * 1000, HOUR = 60 * MIN, DAY = 24 * HOUR;
 const C = {
   ROUTING: '999000014',            // fictional, passes the ABA checksum
   DAILY_LIMIT: 50000000,           // $500,000 rolling 24h (transfers + bill pay)
-  MAX_DEPOSIT: 500000,             // $5,000 per demo deposit
-  DEPOSIT_DAY_CAP: 2500000,        // $25,000 rolling 24h demo deposits
+  MAX_DEPOSIT: 50000000,           // $500,000 per demo deposit
+  DEPOSIT_DAY_CAP: 250000000,      // $2,500,000 rolling 24h demo deposits
   MAX_CARDS: 3,
   MAX_BENEFICIARIES: 12,
   SESSION_MS: 7 * DAY,

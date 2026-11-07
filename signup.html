@@ -86,6 +86,9 @@
 const $ = id => document.getElementById(id);
 let theme = 'emerald';
 
+// already logged in? go straight to the dashboard
+API.get('/me').then(r => { if (r.ok) location.replace('dashboard.html'); });
+
 // theme picker
 Object.entries(THEMES).forEach(([key, bg]) => {
   const d = document.createElement('div');
@@ -99,25 +102,37 @@ Object.entries(THEMES).forEach(([key, bg]) => {
   $('themes').appendChild(d);
 });
 
-// account number validation
-function validateAcct() {
-  const v = $('acct').value;
-  const r = Account.check(v);
-  const hint = $('acctHint');
-  hint.textContent = v ? r.msg : '';
-  hint.className = 'hint ' + (v ? (r.ok ? 'ok' : 'err') : '');
-  $('acct').classList.toggle('bad', !!v && !r.ok && v.length === 10);
+// account number: quick checks here, availability checked by the server
+let checkSeq = 0, checkTimer = null;
+function setHint(msg, cls) { $('acctHint').textContent = msg; $('acctHint').className = 'hint ' + cls; }
+async function validateAcct() {
+  const v = $('acct').value, my = ++checkSeq;
+  if (!v) { setHint('', ''); $('acct').classList.remove('bad'); return false; }
+  const l = Account.localCheck(v);
+  if (!l.ok) { setHint(l.msg, 'err'); return false; }
+  setHint('Checking...', '');
+  const r = await Account.check(v);
+  if (my !== checkSeq) return false;               // a newer keystroke replaced this check
+  setHint(r.msg, r.ok ? 'ok' : 'err');
+  $('acct').classList.toggle('bad', !r.ok);
   return r.ok;
 }
-$('acct').addEventListener('input', e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 12); validateAcct(); });
-$('btnRandom').onclick = () => { $('acct').value = Account.random(); validateAcct(); $('chips').innerHTML = ''; };
+$('acct').addEventListener('input', e => {
+  e.target.value = e.target.value.replace(/\D/g, '').slice(0, 12);
+  clearTimeout(checkTimer); checkTimer = setTimeout(validateAcct, 300);
+});
+$('btnRandom').onclick = async () => {
+  const n = await Account.random();
+  if (n) { $('acct').value = n; validateAcct(); }
+  $('chips').innerHTML = '';
+};
 $('btnPhone').onclick = () => {
   const n = Account.fromPhone($('phone').value);
-  if (!n) { $('acctHint').textContent = 'Enter a valid phone number first.'; $('acctHint').className = 'hint err'; return; }
+  if (!n) { setHint('Enter a valid phone number first.', 'err'); return; }
   $('acct').value = n; validateAcct();
 };
-$('btnSuggest').onclick = () => {
-  const list = Account.suggest($('acct').value);
+$('btnSuggest').onclick = async () => {
+  const list = await Account.suggest($('acct').value);
   $('chips').innerHTML = '';
   list.forEach(n => {
     const c = document.createElement('button');
@@ -130,36 +145,27 @@ $('btnSuggest').onclick = () => {
 // submit
 $('signupForm').addEventListener('submit', async e => {
   e.preventDefault();
-  const alertEl = $('alert');
+  const alertEl = $('alert'), btn = e.target.querySelector('button[type=submit]');
   const name = $('name').value.trim(), email = $('email').value.trim().toLowerCase();
   const phone = $('phone').value.trim(), acct = $('acct').value, pw = $('pw').value;
 
   if (name.length < 2) return showAlert(alertEl, 'err', 'Please enter your full name.');
   if (!/^\S+@\S+\.\S+$/.test(email)) return showAlert(alertEl, 'err', 'Enter a valid email address.');
   if (phone.replace(/\D/g, '').length < 10) return showAlert(alertEl, 'err', 'Enter a valid phone number.');
-  if (!validateAcct()) return showAlert(alertEl, 'err', 'Please choose a valid, available account number.');
+  const l = Account.localCheck(acct);
+  if (!l.ok) return showAlert(alertEl, 'err', l.msg);
   if (pw.length < 8) return showAlert(alertEl, 'err', 'Password must be at least 8 characters.');
   if (pw !== $('pw2').value) return showAlert(alertEl, 'err', 'Passwords do not match.');
-  if (Store.users().some(u => u.email === email)) return showAlert(alertEl, 'err', 'An account with this email already exists.');
 
-  const id = newId();
-  const salt = Math.random().toString(36).slice(2);
-  const user = {
-    id, name, email, phone, salt,
-    passwordHash: await hashPassword(pw, salt),
-    accountNumber: acct,
-    nickname: $('nick').value.trim() || 'Main Account',
-    theme,
-    balance: 0,
-    createdAt: new Date().toISOString()
-  };
-  const users = Store.users(); users.push(user); Store.save(users);
-  Store.setSession(id);
+  btn.disabled = true; btn.textContent = 'Creating...';
+  const r = await API.post('/auth/signup', { name, email, phone, password: pw, accountNumber: acct, nickname: $('nick').value.trim(), theme });
+  if (!r.ok) {
+    btn.disabled = false; btn.textContent = 'Create account';
+    return showAlert(alertEl, 'err', r.msg);
+  }
   showAlert(alertEl, 'ok', 'Account created! Redirecting...');
-  setTimeout(() => location.href = 'dashboard.html', 700);
+  setTimeout(() => location.href = 'dashboard.html', 600);
 });
-
-if (Store.currentUser()) location.href = 'dashboard.html';
 </script>
 </body>
 </html>

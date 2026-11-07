@@ -1,0 +1,8 @@
+{
+  "name": "vaulta",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Vaulta demo bank: static site + one serverless API function",
+  "engines": { "node": "22.x" },
+  "dependencies": { "pg": "^8.13.1" }
+}

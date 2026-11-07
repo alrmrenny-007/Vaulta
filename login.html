@@ -45,24 +45,23 @@
 <script src="app.js"></script>
 <script>
 const $ = id => document.getElementById(id);
-if (Store.currentUser()) location.href = 'dashboard.html';
+
+// already logged in? go straight to the dashboard
+API.get('/me').then(r => { if (r.ok) location.replace('dashboard.html'); });
 
 $('loginForm').addEventListener('submit', async e => {
   e.preventDefault();
-  const alertEl = $('alert');
-  const idv = $('id').value.trim().toLowerCase();
-  const pw = $('pw').value;
+  const alertEl = $('alert'), btn = e.target.querySelector('button[type=submit]');
+  const idv = $('id').value.trim(), pw = $('pw').value;
   if (!idv || !pw) return showAlert(alertEl, 'err', 'Enter your email/account number and password.');
-
-  const user = Store.users().find(u => u.email === idv || u.accountNumber === idv);
-  const bad = 'Incorrect details. Please try again.';
-  if (!user) return showAlert(alertEl, 'err', bad);
-  const h = await hashPassword(pw, user.salt);
-  if (h !== user.passwordHash) return showAlert(alertEl, 'err', bad);
-
-  Store.setSession(user.id);
+  btn.disabled = true; btn.textContent = 'Logging in...';
+  const r = await API.post('/auth/login', { identifier: idv, password: pw });
+  if (!r.ok) {
+    btn.disabled = false; btn.textContent = 'Log in';
+    return showAlert(alertEl, 'err', r.msg);
+  }
   showAlert(alertEl, 'ok', 'Welcome back! Redirecting...');
-  setTimeout(() => location.href = 'dashboard.html', 500);
+  setTimeout(() => location.href = 'dashboard.html', 400);
 });
 </script>
 </body>

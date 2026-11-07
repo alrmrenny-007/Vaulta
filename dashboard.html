@@ -14,7 +14,7 @@
 <div class="blobs"><i></i><i></i><i></i></div>
 <div class="app-shell">
   <aside class="sidebar" id="sidebar"></aside>
-  <main class="main" id="view"></main>
+  <main class="main" id="view"><div class="empty" style="padding-top:90px">Loading your account...</div></main>
 </div>
 <nav class="bottom-nav" id="bottomNav"></nav>
 
@@ -25,11 +25,18 @@ const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = Bank.fmt;
-const STATES = 'AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY'.split(' ');
 
-let me = Bank.me();
-if (!me) location.replace('login.html');
-const refresh = () => { me = Bank.me(); if (!me) location.replace('login.html'); };
+let me = null, lastFetch = 0, showSeq = 0, loadError = '';
+// Re-reads the account from the server. Returns false if that failed (401 sends you to log in).
+async function refresh() {
+  const r = await Bank.load();
+  if (!r.ok) {
+    if (r.status === 401) { location.replace('login.html'); return false; }
+    loadError = r.msg; return false;
+  }
+  me = r.me; lastFetch = Date.now(); loadError = '';
+  return true;
+}
 
 let lastShown = null;
 let route = 'home', hideBal = false, tTab = 'send', hFilter = 'all', hQuery = '';
@@ -69,7 +76,7 @@ function promptModal(html, mount) {
 const digitsOnly = el => el.addEventListener('input', () => { el.value = el.value.replace(/\D/g, ''); });
 
 function askPin(title) {
-  if (!me.pinHash) return createPin();
+  if (!me.hasPin) return createPin();
   return promptModal(
     `<h3>${esc(title || 'Enter transaction PIN')}</h3>
      <input class="input pin-input" id="pinIn" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="off">
@@ -96,7 +103,7 @@ function createPin() {
         if (a !== b) return toast('PINs do not match', 'err');
         const r = await Bank.setPin(me.id, a, '');
         if (!r.ok) return toast(r.msg, 'err');
-        refresh(); toast('PIN saved'); done(a);
+        await refresh(); toast('PIN saved'); done(a);
       };
     });
 }
@@ -165,7 +172,7 @@ function viewHome() {
     <button data-go="cardreq"><span class="ic">💳</span>Get a card</button>
   </div>
   ${live.length ? '' : `<div class="panel" style="margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-    <div><b>Request your debit card</b><div class="muted small">Cards start at $10. Virtual cards are instant.</div></div><button class="btn btn-primary btn-sm" data-go="cardreq">Request card</button></div>`}
+    <div><b>Request your debit card</b><div class="muted small">Cards start at $5. Virtual cards are instant.</div></div><button class="btn btn-primary btn-sm" data-go="cardreq">Request card</button></div>`}
   <div class="panel"><div class="panel-head"><h3>Recent activity</h3><button class="link-btn" data-go="history">See all</button></div>
     ${rec.length ? rec.map(txRow).join('') : '<div class="empty">No transactions yet. Use Add money to get started.</div>'}</div>`;
 }
@@ -217,7 +224,7 @@ function cardBlock(c) {
   else acts = `<button class="btn btn-sm" data-act="advance" data-id="${c.id}">Demo: next delivery stage</button>
     <button class="btn btn-sm btn-danger" data-act="cancelCard" data-id="${c.id}">Cancel request</button>`;
   return `<div class="card-block">${cardVisual(c)}<div>
-    <h3>${esc(t.label)} ${c.kind} card</h3>
+    <h3>${esc(t.label)} ${c.kind === 'virtual' ? '' : c.kind + ' '}card</h3>
     <p class="muted small" style="margin:4px 0 12px">Ending ${c.number.slice(-4)} · ${c.limit ? 'Daily spend limit ' + fmt(c.limit) : 'No custom spend limit'}</p>
     ${trackHtml(c)}<div class="card-actions">${acts}</div></div></div>`;
 }
@@ -239,7 +246,7 @@ function viewCardReq() {
       <div class="field"><label>Street address</label><input class="input" id="cAddr" placeholder="123 Main St" autocomplete="address-line1"></div>
       <div class="field"><label>Apt / Suite (optional)</label><input class="input" id="cApt" autocomplete="address-line2"></div>
       <div class="row"><div class="field"><label>City</label><input class="input" id="cCity" autocomplete="address-level2"></div>
-      <div class="field"><label>State</label><select class="input" id="cState"><option value="">Select</option>${STATES.map(s => `<option>${s}</option>`).join('')}</select></div></div>
+      <div class="field"><label>State</label><select class="input" id="cState"><option value="">Select</option>${Bank.STATES.map(s => `<option>${s}</option>`).join('')}</select></div></div>
       <div class="row"><div class="field"><label>ZIP code</label><input class="input" id="cZip" inputmode="numeric" maxlength="5" placeholder="10001" autocomplete="postal-code"></div>
       <div class="field"><label>Phone</label><input class="input" id="cPhone" inputmode="tel" value="${esc(me.phone)}"></div></div>
     </div>
@@ -259,7 +266,8 @@ function viewHistory() {
   <div class="filters">${[['all', 'All'], ['credit', 'Money in'], ['debit', 'Money out']].map(([k, l]) => `<button class="pill ${hFilter === k ? 'on' : ''}" data-act="filter" data-v="${k}">${l}</button>`).join('')}
     <input class="input" id="hSearch" placeholder="Search" value="${esc(hQuery)}">
     <button class="btn btn-sm" data-act="csv">Export CSV</button><button class="btn btn-sm" data-act="print">Print</button></div>
-  <div class="panel" id="histList"></div>`;
+  <div class="panel" id="histList"></div>
+  ${me.hasMoreTx ? '<div style="text-align:center;margin-top:14px"><button class="btn" data-act="older">Load older transactions</button></div>' : ''}`;
 }
 function drawHist(quiet) {
   const list = filteredTx();
@@ -284,8 +292,8 @@ function viewSettings() {
     <div class="field"><label>Nickname</label><input class="input" id="stNick" maxlength="30" value="${esc(me.nickname)}"></div>
     <div class="field"><label>Account colour</label><div class="themes" id="stThemes"></div></div>
     <button class="btn btn-primary">Save changes</button></form>
-  <form class="panel" id="pinForm"><h3 class="sec-title">${me.pinHash ? 'Change' : 'Create'} transaction PIN</h3>
-    ${me.pinHash ? '<div class="field"><label>Current PIN</label><input class="input" id="pnCur" type="password" inputmode="numeric" maxlength="4"></div>' : ''}
+  <form class="panel" id="pinForm"><h3 class="sec-title">${me.hasPin ? 'Change' : 'Create'} transaction PIN</h3>
+    ${me.hasPin ? '<div class="field"><label>Current PIN</label><input class="input" id="pnCur" type="password" inputmode="numeric" maxlength="4"></div>' : ''}
     <div class="row"><div class="field"><label>New PIN</label><input class="input" id="pnNew" type="password" inputmode="numeric" maxlength="4"></div>
     <div class="field"><label>Confirm PIN</label><input class="input" id="pnNew2" type="password" inputmode="numeric" maxlength="4"></div></div>
     <button class="btn btn-primary">Save PIN</button></form>
@@ -310,38 +318,45 @@ const wire = {
         if (ref.length < 4) return toast('Enter the account number from your bill', 'err');
         if (!(amt >= 100)) return toast('Minimum payment is $1.00', 'err');
         if (amt > me.balance) return toast('Insufficient balance', 'err');
+        const idem = Bank.newKey();
         if (!await confirmModal('Confirm bill payment', [['Type', cat], ['Payee', payee], ['Account', ref], ['Amount', fmt(amt)]], 'Pay')) return;
         const pin = await askPin(); if (!pin) return;
-        const r = await Bank.billPay(me.id, cat, payee, ref, amt, pin);
+        const r = await Bank.billPay(me.id, cat, payee, ref, amt, pin, idem);
         if (!r.ok) return toast(r.msg, 'err');
-        refresh(); receipt(r.tx); show('transfer');
+        await refresh(); receipt(r.tx); show('transfer');
       };
       return;
     }
     const acct = $('#sAcct'), hint = $('#sHint');
     digitsOnly(acct);
     $('#sAmt').addEventListener('input', e => e.target.value = e.target.value.replace(/[^\d.]/g, ''));
-    const check = () => {
-      if (acct.value.length < 8) { hint.textContent = ''; hint.className = 'hint'; return null; }
-      const r = Bank.lookup(acct.value);
-      if (!r) { hint.textContent = 'Account not found.'; hint.className = 'hint err'; return null; }
-      if (r.id === me.id) { hint.textContent = "That's your own account."; hint.className = 'hint err'; return null; }
-      hint.textContent = '✓ ' + r.name; hint.className = 'hint ok'; return r;
+    let lookupSeq = 0, found = null, timer = null;
+    const setHint = (txt, cls) => { hint.textContent = txt; hint.className = 'hint ' + cls; };
+    const check = async () => {
+      const n = acct.value, my = ++lookupSeq; found = null;
+      if (n.length < 8) { setHint('', ''); return null; }
+      setHint('Checking...', '');
+      const r = await Bank.lookup(n);
+      if (my !== lookupSeq) return null;                 // a newer keystroke replaced this lookup
+      if (!r.ok) { setHint(r.msg, 'err'); return null; }
+      found = { name: r.name, acct: r.acct };
+      setHint('✓ ' + r.name, 'ok');
+      return found;
     };
-    acct.addEventListener('input', check);
-    window.__checkAcct = check;
+    acct.addEventListener('input', () => { clearTimeout(timer); found = null; timer = setTimeout(check, 250); });
     f.onsubmit = async e => {
       e.preventDefault();
-      const rec = check(), amt = Bank.toKobo($('#sAmt').value), note = $('#sNote').value.trim();
+      const rec = found || await check(), amt = Bank.toKobo($('#sAmt').value), note = $('#sNote').value.trim();
       if (!rec) return toast('Enter a valid recipient account number', 'err');
       if (!(amt >= 100)) return toast('Minimum transfer is $1.00', 'err');
       if (amt > me.balance) return toast('Insufficient balance', 'err');
+      const idem = Bank.newKey();                         // a retry of this same confirmation can never pay twice
       if (!await confirmModal('Confirm transfer', [['To', rec.name], ['Account', rec.acct], ['Amount', fmt(amt)], ['Narration', note || '-']], 'Send')) return;
       const pin = await askPin(); if (!pin) return;
-      const r = await Bank.transfer(me.id, rec.acct, amt, note, pin);
+      const r = await Bank.transfer(me.id, rec.acct, amt, note, pin, idem);
       if (!r.ok) return toast(r.msg, 'err');
-      if ($('#sSave').checked) Bank.addBeneficiary(me.id, rec);
-      refresh(); receipt(r.tx); show('transfer');
+      if ($('#sSave').checked) await Bank.addBeneficiary(me.id, rec);
+      await refresh(); receipt(r.tx); show('transfer');
     };
   },
   cardreq() {
@@ -363,7 +378,7 @@ const wire = {
       const pin = await askPin(); if (!pin) return;
       const r = await Bank.requestCard(me.id, o, pin);
       if (!r.ok) return toast(r.msg, 'err');
-      refresh(); toast(t.physical ? 'Card requested. Track delivery below.' : 'Virtual card is ready!'); show('cards');
+      await refresh(); toast(t.physical ? 'Card requested. Track delivery below.' : 'Virtual card is ready!'); show('cards');
     };
   },
   history() {
@@ -382,32 +397,44 @@ const wire = {
       });
     };
     draw();
+    let ck = 0, tm = null;
     $('#stAcct').addEventListener('input', e => {
-      const r = Account.check(e.target.value, me.id); const h = $('#stHint');
-      h.textContent = r.msg; h.className = 'hint ' + (r.ok ? 'ok' : 'err');
+      clearTimeout(tm); const val = e.target.value, my = ++ck;
+      tm = setTimeout(async () => {
+        const r = await Account.check(val); const h = $('#stHint');
+        if (my !== ck || !h) return;
+        h.textContent = r.msg; h.className = 'hint ' + (r.ok ? 'ok' : 'err');
+      }, 250);
     });
-    $('#profForm').onsubmit = e => {
+    $('#profForm').onsubmit = async e => {
       e.preventDefault();
       const name = $('#stName').value.trim(), phone = $('#stPhone').value.trim();
       if (name.length < 2) return toast('Enter your name', 'err');
       if (phone.replace(/\D/g, '').length < 10) return toast('Enter a valid phone number', 'err');
-      Store.updateUser(me.id, { name, phone }); refresh(); toast('Profile saved'); show('settings');
+      const r = await API.patch('/me/profile', { name, phone });
+      if (!r.ok) return toast(r.msg, 'err');
+      await refresh(); toast('Profile saved'); show('settings');
     };
     $('#acctForm').onsubmit = async e => {
       e.preventDefault();
-      const n = $('#stAcct').value, r = Account.check(n, me.id);
+      const n = $('#stAcct').value, body = { accountNumber: n, nickname: $('#stNick').value.trim() || 'Main Account', theme: stTheme };
+      if (n === me.accountNumber) delete body.accountNumber;
+      else {
+        const lc = Account.localCheck(n); if (!lc.ok) return toast(lc.msg, 'err');
+        const pin = await askPin('Confirm with your PIN'); if (!pin) return;
+        body.pin = pin;                                   // the server verifies the PIN
+      }
+      const r = await API.patch('/me/account', body);
       if (!r.ok) return toast(r.msg, 'err');
-      if (n !== me.accountNumber) { const pin = await askPin('Confirm with your PIN'); if (!pin) return; const c = await Bank.checkPin(me.id, pin); if (!c.ok) return toast(c.msg, 'err'); }
-      Store.updateUser(me.id, { accountNumber: n, nickname: $('#stNick').value.trim() || 'Main Account', theme: stTheme });
-      refresh(); toast('Account updated'); show('settings');
+      await refresh(); toast('Account updated'); show('settings');
     };
     $('#pinForm').onsubmit = async e => {
       e.preventDefault();
       const a = $('#pnNew').value, b = $('#pnNew2').value;
       if (a !== b) return toast('PINs do not match', 'err');
-      const r = await Bank.setPin(me.id, a, me.pinHash ? $('#pnCur').value : '');
+      const r = await Bank.setPin(me.id, a, me.hasPin ? $('#pnCur').value : '');
       if (!r.ok) return toast(r.msg, 'err');
-      refresh(); toast('PIN updated'); show('settings');
+      await refresh(); toast('PIN updated'); show('settings');
     };
     $('#pwForm').onsubmit = async e => {
       e.preventDefault();
@@ -422,13 +449,13 @@ const wire = {
 const ADD_METHODS = {
   bank: { icon: '🏦', title: 'Transfer from a bank account', sub: 'ACH from another bank. Usually 1-3 business days (instant in this demo).',
     fields: [{ id: 'bn', label: 'Bank name', ph: 'e.g. First Demo Bank', max: 30, err: 'Enter the bank name' }, { id: 'l4', label: 'Account ending in (last 4 digits)', ph: '1234', max: 4, digits: true, err: 'Enter the last 4 digits' }],
-    narr: f => `ACH transfer from ${f.bn} ••${f.l4}`, name: f => f.bn },
+    body: f => ({ method: 'bank', bankName: f.bn, last4: f.l4 }) },
   card: { icon: '💳', title: 'Add with a debit card', sub: 'Instant top-up from a debit card you own.',
     fields: [{ id: 'l4', label: 'Debit card ending in (last 4 digits)', ph: '1234', max: 4, digits: true, err: 'Enter the last 4 digits' }],
-    narr: f => `Debit card top-up ••${f.l4}`, name: f => `Debit card ••${f.l4}` },
+    body: f => ({ method: 'card', last4: f.l4 }) },
   check: { icon: '📷', title: 'Mobile check deposit', sub: 'Deposit a paper check. Funds usually clear in 1-2 business days (instant in this demo).',
     fields: [{ id: 'cn', label: 'Check number', ph: '1042', max: 4, digits: true, err: 'Enter the 4-digit check number' }],
-    narr: f => `Mobile check deposit #${f.cn}`, name: f => `Check #${f.cn}` },
+    body: f => ({ method: 'check', checkNumber: f.cn }) },
   dd: { icon: '🏢', title: 'Set up direct deposit', sub: 'Get your routing and account number to give your employer.' }
 };
 function directDeposit() {
@@ -458,12 +485,22 @@ const acts = {
   billGo() { tTab = 'bills'; show('transfer'); },
   filter(el) { hFilter = el.dataset.v; show('history'); },
   csv() {
-    const blob = new Blob([Bank.toCsv(me, filteredTx())], { type: 'text/csv' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-    a.download = 'vaulta-statement-' + me.accountNumber + '.csv'; a.click(); URL.revokeObjectURL(a.href);
+    const p = new URLSearchParams();
+    if (hFilter !== 'all') p.set('filter', hFilter);
+    if (hQuery) p.set('q', hQuery);
+    const a = document.createElement('a');
+    a.href = '/api/transactions/export' + (p.toString() ? '?' + p : '');      // the server builds the statement
+    a.download = ''; document.body.appendChild(a); a.click(); a.remove();
+  },
+  async older() {
+    const last = me.transactions[me.transactions.length - 1]; if (!last) return;
+    const r = await API.get('/transactions?limit=200&before=' + last.seq);
+    if (!r.ok) return toast(r.msg, 'err');
+    me.transactions = me.transactions.concat(r.transactions); me.hasMoreTx = r.hasMore;
+    lastFetch = Date.now(); show('history');
   },
   print() { window.print(); },
-  logout() { Store.clearSession(); location.href = 'login.html'; },
+  async logout() { await API.post('/auth/logout'); location.href = 'login.html'; },
   async addMoney() {
     const k = await promptModal(
       `<h3>Add money</h3><p class="muted small" style="margin-bottom:14px">Demo only. No real money moves.</p>
@@ -493,9 +530,9 @@ const acts = {
         };
       });
     if (!f) return;
-    const r = Bank.fund(me.id, f.cents, { narration: cfg.narr(f), name: cfg.name(f) });
+    const r = await Bank.fund(me.id, f.cents, cfg.body(f));
     if (!r.ok) return toast(r.msg, 'err');
-    refresh(); show(route); receipt(r.tx);
+    await refresh(); show(route); receipt(r.tx);
   },
   async reveal(el) {
     const pin = await askPin('Enter PIN to show card details'); if (!pin) return;
@@ -506,25 +543,25 @@ const acts = {
       <p class="muted small" style="margin-top:10px">Demo card. Fictional number.</p>
       <div class="modal-actions"><button class="btn btn-primary" data-act="closeModal">Close</button></div>`);
   },
-  freeze(el) { const r = Bank.toggleFreeze(me.id, el.dataset.id); if (!r.ok) return toast(r.msg, 'err'); refresh(); toast(r.card.frozen ? 'Card frozen' : 'Card unfrozen'); show('cards'); },
+  async freeze(el) { const r = await Bank.toggleFreeze(me.id, el.dataset.id); if (!r.ok) return toast(r.msg, 'err'); await refresh(); toast(r.card.frozen ? 'Card frozen' : 'Card unfrozen'); show('cards'); },
   async limit(el) {
     const v = await fieldModal('Daily spend limit', 'Amount ($). Use 0 for no custom limit.', '1000', 'Save', { numeric: true });
     if (v === null) return;
-    const r = Bank.setCardLimit(me.id, el.dataset.id, Bank.toKobo(v || '0'));
+    const r = await Bank.setCardLimit(me.id, el.dataset.id, Bank.toKobo(v || '0'));
     if (!r.ok) return toast(r.msg, 'err');
-    refresh(); toast('Limit saved'); show('cards');
+    await refresh(); toast('Limit saved'); show('cards');
   },
   async cancelCard(el) {
     if (!await confirmModal('Cancel this card?', [['Note', 'This cannot be undone. The issuance fee is not refunded.']], 'Cancel card')) return;
-    const r = Bank.cancelCard(me.id, el.dataset.id); if (!r.ok) return toast(r.msg, 'err');
-    refresh(); toast('Card cancelled'); show('cards');
+    const r = await Bank.cancelCard(me.id, el.dataset.id); if (!r.ok) return toast(r.msg, 'err');
+    await refresh(); toast('Card cancelled'); show('cards');
   },
-  advance(el) { const r = Bank.advanceCard(me.id, el.dataset.id); if (!r.ok) return toast(r.msg, 'err'); refresh(); show('cards'); },
+  async advance(el) { const r = await Bank.advanceCard(me.id, el.dataset.id); if (!r.ok) return toast(r.msg, 'err'); await refresh(); show('cards'); },
   async activate(el) {
     const pin = await askPin('Enter PIN to activate card'); if (!pin) return;
     const r = await Bank.activateCard(me.id, el.dataset.id, pin);
     if (!r.ok) return toast(r.msg, 'err');
-    refresh(); toast('Card activated'); show('cards');
+    await refresh(); toast('Card activated'); show('cards');
   }
 };
 
@@ -544,11 +581,17 @@ function renderNav() {
     `<div class="side-foot"><div class="muted small" style="padding:0 14px 10px">${esc(me.name)}</div><button class="side-link" data-act="logout">🚪 Log out</button></div>`;
   $('#bottomNav').innerHTML = NAV.map(([k, ic, l]) => `<button class="${k === active ? 'active' : ''}" data-go="${k}"><span>${ic}</span>${l}</button>`).join('');
 }
-function show(r) {
+async function show(r) {
+  const seq = ++showSeq;
   route = VIEWS[r] ? r : 'home';
   if (location.hash !== '#' + route) history.replaceState(null, '', '#' + route);
-  refresh();
-  if (!me) return;
+  if (!me || Date.now() - lastFetch > 5000) await refresh();    // data older than 5s is re-read from the server
+  if (seq !== showSeq) return;                                  // a newer navigation took over
+  if (!me) {
+    $('#view').innerHTML = `<div class="panel"><h3>We couldn't load your account</h3><p class="muted" style="margin:8px 0 14px">${esc(loadError || 'Please try again.')}</p>
+      <button class="btn btn-primary" onclick="location.reload()">Try again</button> <a class="btn" href="login.html">Back to log in</a></div>`;
+    return;
+  }
   const changed = route !== lastShown; lastShown = route;
   const v = $('#view');
   v.classList.toggle('noanim', !changed);
@@ -558,8 +601,8 @@ function show(r) {
   FX.tilt(v);
   if (changed) {
     window.scrollTo(0, 0);
-    const b = $('#balBig');
-    if (b && route === 'home' && !hideBal) FX.countUp(b, me.balance, fmt);
+    const bb = $('#balBig');
+    if (bb && route === 'home' && !hideBal) FX.countUp(bb, me.balance, fmt);
   }
 }
 window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (h !== route && VIEWS[h]) show(h); });

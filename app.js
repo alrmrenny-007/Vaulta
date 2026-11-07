@@ -1,9 +1,7 @@
-/* Vaulta shared logic
-   DEMO ONLY: data lives in this browser's localStorage.
-   Replace with a real backend before handling real users or money. */
+/* Vaulta shared browser code.
+   All accounts, balances and rules live on the server (/api). This file only sends requests
+   and holds small UI helpers. Nothing sensitive is kept in the browser. */
 
-const USERS_KEY = 'vaulta_users';
-const SESSION_KEY = 'vaulta_session';
 const THEMES = {
   emerald: 'linear-gradient(135deg,#0d7a56,#2ee59d)',
   ocean: 'linear-gradient(135deg,#0b4f8a,#18b4ff)',
@@ -11,68 +9,51 @@ const THEMES = {
   violet: 'linear-gradient(135deg,#4b2a9a,#b983ff)'
 };
 
-const Store = {
-  users() { try { return JSON.parse(localStorage.getItem(USERS_KEY)) || []; } catch { return []; } },
-  save(users) { localStorage.setItem(USERS_KEY, JSON.stringify(users)); },
-  session() { return localStorage.getItem(SESSION_KEY); },
-  setSession(id) { localStorage.setItem(SESSION_KEY, id); },
-  clearSession() { localStorage.removeItem(SESSION_KEY); },
-  currentUser() { const id = Store.session(); return Store.users().find(u => u.id === id) || null; },
-  updateUser(id, patch) {
-    const users = Store.users();
-    const i = users.findIndex(u => u.id === id);
-    if (i === -1) return;
-    users[i] = { ...users[i], ...patch };
-    Store.save(users);
-  }
+const API = {
+  async call(method, path, body) {
+    let res;
+    try {
+      res = await fetch('/api' + path, {
+        method, credentials: 'same-origin',
+        headers: body !== undefined ? { 'Content-Type': 'application/json' } : {},
+        body: body !== undefined ? JSON.stringify(body) : undefined
+      });
+    } catch (e) {
+      return { ok: false, status: 0, code: 'NETWORK', msg: 'Network problem. Check your connection and try again.' };
+    }
+    let data = {};
+    try { data = await res.json(); } catch (e) { /* not JSON */ }
+    if (res.ok && data.ok !== false) return Object.assign({}, data, { ok: true, status: res.status });
+    const fallback = res.status === 404 ? 'The server part of the site is not set up yet (API not found).' : 'Something went wrong. Please try again.';
+    return Object.assign({}, data, { ok: false, status: res.status, msg: data.error || fallback });
+  },
+  get(p) { return API.call('GET', p); },
+  post(p, b) { return API.call('POST', p, b || {}); },
+  patch(p, b) { return API.call('PATCH', p, b || {}); },
+  del(p) { return API.call('DELETE', p); }
 };
-
-async function hashPassword(pw, salt) {
-  const data = new TextEncoder().encode(salt + ':' + pw);
-  if (!window.crypto || !crypto.subtle) return btoa(unescape(encodeURIComponent(salt + pw)));
-  const buf = await crypto.subtle.digest('SHA-256', data);
-  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
-}
 
 const Account = {
   MIN: 8, MAX: 12,
-  isValidFormat: n => /^\d{8,12}$/.test(n),
-  isTaken(n, exceptUserId) { return Store.users().some(u => u.accountNumber === n && u.id !== exceptUserId); },
-  random() {
-    let n;
-    do {
-      n = String(1 + Math.floor(Math.random() * 9));
-      for (let i = 1; i < 10; i++) n += Math.floor(Math.random() * 10);
-    } while (Account.isTaken(n));
-    return n;
-  },
-  fromPhone(phone) {
-    const d = (phone || '').replace(/\D/g, '');
-    return d.length >= 10 ? d.slice(-10) : '';
-  },
-  // Suggest free numbers that keep the user's chosen leading digits
-  suggest(prefix, count = 4) {
-    const base = (prefix || '').replace(/\D/g, '').slice(0, 9);
-    const out = new Set();
-    let guard = 0;
-    while (out.size < count && guard++ < 200) {
-      let n = base;
-      while (n.length < 10) n += Math.floor(Math.random() * 10);
-      if (n[0] === '0' && !base) continue;
-      if (!Account.isTaken(n)) out.add(n);
-    }
-    return [...out];
-  },
-  format: n => (n || '').replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3'),
-  // Returns {ok, msg}
-  check(n, exceptUserId) {
+  fromPhone(phone) { const d = (phone || '').replace(/\D/g, ''); return d.length >= 10 ? d.slice(-10) : ''; },
+  format: n => n || '',
+  // Quick checks in the browser. The server checks everything again.
+  localCheck(n) {
     if (!n) return { ok: false, msg: 'Enter an account number (8 to 12 digits).' };
     if (!/^\d+$/.test(n)) return { ok: false, msg: 'Digits only.' };
     if (n.length < 8) return { ok: false, msg: `At least 8 digits needed (${8 - n.length} more).` };
     if (n.length > 12) return { ok: false, msg: 'Maximum 12 digits.' };
-    if (Account.isTaken(n, exceptUserId)) return { ok: false, msg: 'That number is already taken. Try another.' };
-    return { ok: true, msg: 'Available. This can be your account number.' };
-  }
+    return { ok: true, msg: '' };
+  },
+  async check(n) {
+    const l = Account.localCheck(n);
+    if (!l.ok) return l;
+    const r = await API.get('/account/check?n=' + encodeURIComponent(n));
+    if (!r.ok) return { ok: false, msg: r.msg };
+    return { ok: r.available, msg: r.message };
+  },
+  async random() { const r = await API.get('/account/random'); return r.ok ? r.accountNumber : ''; },
+  async suggest(prefix) { const r = await API.get('/account/suggest?prefix=' + encodeURIComponent(prefix || '')); return r.ok ? r.suggestions : []; }
 };
 
 function togglePw(btn) {
@@ -81,9 +62,7 @@ function togglePw(btn) {
   input.type = show ? 'text' : 'password';
   btn.textContent = show ? 'HIDE' : 'SHOW';
 }
-
 function showAlert(el, type, msg) { el.className = 'alert ' + type; el.textContent = msg; }
-function newId() { return 'u_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 
 /* ---- UI effects (motion helpers shared by all pages) ---- */
 const FX = {

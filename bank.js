@@ -4,16 +4,15 @@
 const Bank = (() => {
   const B = {
     ROUTING: '999000014',
-    DAILY_LIMIT: 500000,
+    DAILY_LIMIT: 50000000,
     MAX_TOPUP: 500000,
     MAX_CARDS: 3,
     BILL_CATEGORIES: ['Electric', 'Gas & Water', 'Internet & Cable', 'Mobile Phone', 'Credit Card', 'Rent & Other'],
     STATES: 'AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY'.split(' '),
     // fee / label / physical come from the server; the colours and notes are display only
     TIERS: {
-      virtual:  { label: 'Virtual',  fee: 500,  physical: false, bg: 'linear-gradient(135deg,#0d7a56,#18b4ff)', note: 'Instant. For online and in-app payments.' },
-      standard: { label: 'Standard', fee: 1500, physical: true,  bg: 'linear-gradient(135deg,#1c2538,#3e4e70)', note: 'Physical card. Arrives in 7-10 business days.' },
-      platinum: { label: 'Premier',  fee: 3500, physical: true,  bg: 'linear-gradient(135deg,#2a2210,#c09a45)', note: 'Premium design. Expedited, 3-5 business days.' }
+      standard: { label: 'Standard', fee: 1500, physical: true,  bg: 'linear-gradient(135deg,#1c2538,#3e4e70)', note: 'Physical card. Arrives in 10-15 business days.' },
+      platinum: { label: 'Premier',  fee: 3500, physical: true,  bg: 'linear-gradient(135deg,#2a2210,#c09a45)', note: 'Premium design. Expedited, 5-10 business days.' }
     },
     STAGES: ['requested', 'processing', 'shipped', 'delivered', 'active'],
     STAGE_LABEL: { requested: 'Requested', processing: 'Processing', shipped: 'On the way', delivered: 'Delivered', active: 'Active' }

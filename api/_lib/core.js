@@ -9,7 +9,7 @@ const scrypt = promisify(crypto.scrypt);
 const MIN = 60 * 1000, HOUR = 60 * MIN, DAY = 24 * HOUR;
 const C = {
   ROUTING: '999000014',            // fictional, passes the ABA checksum
-  DAILY_LIMIT: 500000,             // $5,000 rolling 24h (transfers + bill pay)
+  DAILY_LIMIT: 50000000,           // $500,000 rolling 24h (transfers + bill pay)
   MAX_DEPOSIT: 500000,             // $5,000 per demo deposit
   DEPOSIT_DAY_CAP: 2500000,        // $25,000 rolling 24h demo deposits
   MAX_CARDS: 3,
@@ -17,7 +17,6 @@ const C = {
   SESSION_MS: 7 * DAY,
   CARD_PREFIX: '9999',
   TIERS: {
-    virtual:  { label: 'Virtual',  fee: 500,  physical: false },
     standard: { label: 'Standard', fee: 1500, physical: true },
     platinum: { label: 'Premier',  fee: 3500, physical: true }
   },

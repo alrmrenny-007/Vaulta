@@ -173,3 +173,18 @@ select.input{appearance:none}
 .tick-path{stroke-dasharray:26;stroke-dashoffset:26;animation:drawTick .5s .25s ease-out forwards}
 @keyframes drawTick{to{stroke-dashoffset:0}}
 .receipt-top .big{animation:rise .6s .15s backwards}
+
+/* ---- responsiveness polish ---- */
+.main{margin:0 auto}                                   /* centre the content on wide screens */
+@media(min-width:1500px){.main{max-width:1040px}}
+.link-btn{padding:10px 8px;margin:-10px -8px}           /* bigger tap area */
+.modal{max-height:92vh;max-height:92dvh}
+@media(max-width:820px){
+  .filters .input{max-width:none;flex:1 1 100%}
+  .filters .btn{flex:1 1 auto}
+}
+@media(max-height:480px) and (orientation:landscape){    /* phones turned sideways */
+  .overlay{place-items:start center}
+  .modal{max-height:none}
+  .bottom-nav button{padding:6px 0 8px;flex-direction:row;justify-content:center;gap:6px}
+}

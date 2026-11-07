@@ -234,3 +234,7 @@ h1,h2,h3{font-weight:700}
   *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;animation-delay:0s!important;transition-duration:.001ms!important}
   .reveal{opacity:1;transform:none}
 }
+
+/* ---- responsiveness polish ---- */
+.logo{display:inline-block;padding:8px 0}
+img,svg,video{max-width:100%}

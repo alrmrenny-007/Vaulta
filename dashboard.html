@@ -172,7 +172,7 @@ function viewHome() {
     <button data-go="cardreq"><span class="ic">💳</span>Get a card</button>
   </div>
   ${live.length ? '' : `<div class="panel" style="margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-    <div><b>Request your debit card</b><div class="muted small">Cards start at $5. Virtual cards are instant.</div></div><button class="btn btn-primary btn-sm" data-go="cardreq">Request card</button></div>`}
+    <div><b>Request your debit card</b><div class="muted small">Cards start at $15. Delivered in 10-15 business days.</div></div><button class="btn btn-primary btn-sm" data-go="cardreq">Request card</button></div>`}
   <div class="panel"><div class="panel-head"><h3>Recent activity</h3><button class="link-btn" data-go="history">See all</button></div>
     ${rec.length ? rec.map(txRow).join('') : '<div class="empty">No transactions yet. Use Add money to get started.</div>'}</div>`;
 }
@@ -201,7 +201,7 @@ function trackHtml(c) {
   if (c.kind !== 'physical') return '';
   const idx = Bank.STAGES.indexOf(c.status);
   return '<div class="track">' + Bank.STAGES.map((s, i) => `<div class="step ${i <= idx ? 'done' : ''}"><i></i>${Bank.STAGE_LABEL[s]}</div>`).join('') + '</div>' +
-    (c.status !== 'active' ? `<p class="muted small">Estimated delivery: ${new Date(c.requestedAt + (c.tier === 'platinum' ? 5 : 10) * 864e5).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })} · ${esc(c.delivery.city)}</p>` : '');
+    (c.status !== 'active' ? `<p class="muted small">Estimated delivery: ${new Date(c.requestedAt + (c.tier === 'platinum' ? 10 : 15) * 864e5).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })} · ${esc(c.delivery.city)}</p>` : '');
 }
 function cardVisual(c) {
   const t = Bank.TIERS[c.tier];

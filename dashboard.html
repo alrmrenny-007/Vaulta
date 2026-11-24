@@ -172,7 +172,7 @@ function viewHome() {
     <button data-go="cardreq"><span class="ic">💳</span>Get a card</button>
   </div>
   ${live.length ? '' : `<div class="panel" style="margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-    <div><b>Request your debit card</b><div class="muted small">Cards start at $15. Delivered in 10-15 business days.</div></div><button class="btn btn-primary btn-sm" data-go="cardreq">Request card</button></div>`}
+    <div><b>Request your debit card</b><div class="muted small">Cards start at $15. Delivery in 5-15 business days.</div></div><button class="btn btn-primary btn-sm" data-go="cardreq">Request card</button></div>`}
   <div class="panel"><div class="panel-head"><h3>Recent activity</h3><button class="link-btn" data-go="history">See all</button></div>
     ${rec.length ? rec.map(txRow).join('') : '<div class="empty">No transactions yet. Use Add money to get started.</div>'}</div>`;
 }
@@ -199,19 +199,27 @@ function viewTransfer() {
 
 function trackHtml(c) {
   if (c.kind !== 'physical') return '';
-  const idx = Bank.STAGES.indexOf(c.status);
-  return '<div class="track">' + Bank.STAGES.map((s, i) => `<div class="step ${i <= idx ? 'done' : ''}"><i></i>${Bank.STAGE_LABEL[s]}</div>`).join('') + '</div>' +
-    (c.status !== 'active' ? `<p class="muted small">Estimated delivery: ${new Date(c.requestedAt + (c.tier === 'platinum' ? 10 : 15) * 864e5).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })} · ${esc(c.delivery.city)}</p>` : '');
+  const idx = Bank.STAGES.indexOf(c.status), at = {};
+  (c.events || []).forEach(e => { at[e.stage] = e.at; });
+  const eta = c.etaMin ? [c.etaMin, c.etaMax] : null;
+  const sp = Bank.SHIPPING[c.shipSpeed] ? Bank.SHIPPING[c.shipSpeed].label : 'Standard delivery';
+  return (c.orderNo ? `<div class="order-line"><span>Order <b>${esc(c.orderNo)}</b></span><span class="muted small">Placed ${Bank.fmtDay(c.requestedAt)}</span></div>` : '') +
+    '<div class="track">' + Bank.STAGES.map((s, i) => `<div class="step ${i <= idx ? 'done' : ''}"><i></i>${Bank.STAGE_LABEL[s]}<small>${at[s] ? Bank.fmtDay(at[s]) : '&nbsp;'}</small></div>`).join('') + '</div>' +
+    (c.status !== 'active' && eta ? `<p class="muted small">Estimated delivery <b>${Bank.fmtDay(eta[0])} – ${Bank.fmtDay(eta[1])}</b> · ${esc(sp)}${c.delivery ? ' · ' + esc(c.delivery.city) + ', ' + esc(c.delivery.state) : ''}</p>` : '');
+}
+function cardFace(o) {
+  return `<div class="vcard" ${o.tilt === false ? '' : 'data-tilt'} style="background:${o.bg}">
+    <div class="vc-top"><b>Vaulta</b><span class="badge">${esc(o.badge)}</span></div>
+    <div class="vc-chip"></div>
+    <div class="vc-num">${o.number}</div>
+    <div class="vc-bot"><div><small>CARD HOLDER</small><span class="wz-name">${esc(o.name)}</span></div><div><small>EXPIRES</small>${esc(o.expiry)}</div></div>
+    ${o.overlay || ''}</div>`;
 }
 function cardVisual(c) {
-  const t = Bank.TIERS[c.tier];
+  const t = Bank.TIERS[c.tier], d = Bank.DESIGNS[c.design];
   const pending = c.kind === 'physical' && c.status !== 'active';
-  return `<div class="vcard" data-tilt style="background:${t.bg}">
-    <div class="vc-top"><b>Vaulta</b><span class="badge">${c.kind === 'virtual' ? 'VIRTUAL' : esc(t.label.toUpperCase())}</span></div>
-    <div class="vc-chip"></div>
-    <div class="vc-num">${c.number.slice(0, 4)} •••• •••• ${c.number.slice(-4)}</div>
-    <div class="vc-bot"><div><small>CARD HOLDER</small>${esc(c.nameOnCard)}</div><div><small>EXPIRES</small>${esc(c.expiry)}</div></div>
-    ${c.frozen ? '<div class="vc-ov">❄ Frozen</div>' : pending ? `<div class="vc-ov soft">${esc(Bank.STAGE_LABEL[c.status])}</div>` : ''}</div>`;
+  return cardFace({ bg: d ? d.bg : t.bg, badge: t.label.toUpperCase(), number: c.number.slice(0, 4) + ' •••• •••• ' + c.number.slice(-4), name: c.nameOnCard, expiry: c.expiry,
+    overlay: c.frozen ? '<div class="vc-ov">❄ Frozen</div>' : pending ? `<div class="vc-ov soft">${esc(Bank.STAGE_LABEL[c.status])}</div>` : '' });
 }
 function cardBlock(c) {
   const t = Bank.TIERS[c.tier];
@@ -234,26 +242,86 @@ function viewCards() {
     <div class="panel">${cards.length ? cards.map(cardBlock).join('') : '<div class="empty">You have no cards yet.<br><br><button class="btn btn-primary" data-go="cardreq">Request your debit card</button></div>'}</div>
     `;
 }
-function viewCardReq() {
-  return `<button class="btn btn-sm" data-go="cards">← Back</button>
-  <h1 class="page-title" style="margin-top:14px">Request your debit card</h1>
-  <form class="panel" id="cardForm">
-    <label class="lbl">Choose a card</label>
-    <div class="tier-grid">${Object.entries(Bank.TIERS).map(([k, t], i) => `<label class="tier"><input type="radio" name="tier" value="${k}" ${i === 0 ? 'checked' : ''}>
-      <div class="tier-in"><div class="mini" style="background:${t.bg}"></div><b>${t.label}</b><small><b>${fmt(t.fee)}</b> one-time fee</small><small class="muted">${esc(t.note)}</small></div></label>`).join('')}</div>
-    <div class="field"><label>Name on card</label><input class="input" id="cName" maxlength="22" value="${esc(me.name.toUpperCase().slice(0, 22))}"></div>
-    <div id="shipBox" style="display:none">
-      <div class="field"><label>Street address</label><input class="input" id="cAddr" placeholder="123 Main St" autocomplete="address-line1"></div>
-      <div class="field"><label>Apt / Suite (optional)</label><input class="input" id="cApt" autocomplete="address-line2"></div>
-      <div class="row"><div class="field"><label>City</label><input class="input" id="cCity" autocomplete="address-level2"></div>
-      <div class="field"><label>State</label><select class="input" id="cState"><option value="">Select</option>${Bank.STATES.map(s => `<option>${s}</option>`).join('')}</select></div></div>
-      <div class="row"><div class="field"><label>ZIP code</label><input class="input" id="cZip" inputmode="numeric" maxlength="5" placeholder="10001" autocomplete="postal-code"></div>
-      <div class="field"><label>Phone</label><input class="input" id="cPhone" inputmode="tel" value="${esc(me.phone)}"></div></div>
+/* ---------- card order wizard ---------- */
+let wz = null;
+const WZ_STEPS = ['Card', 'Design', 'Delivery', 'Review'];
+const wzNew = () => ({ step: 1, tier: 'standard', design: 'midnight', name: me.name.toUpperCase().replace(/[^A-Z .'-]/g, '').slice(0, 22), address: '', apt: '', city: '', state: '', zip: '', phone: me.phone, speed: 'standard', placed: null, busy: false });
+const wzTotal = () => Bank.TIERS[wz.tier].fee + Bank.SHIPPING[wz.speed].fee;
+const wzRange = (tier, speed) => { const [a, b] = Bank.eta(tier, speed); return Bank.fmtDay(a) + ' – ' + Bank.fmtDay(b); };
+const wzExpiry = () => { const d = new Date(); d.setFullYear(d.getFullYear() + 4); return String(d.getMonth() + 1).padStart(2, '0') + '/' + String(d.getFullYear()).slice(-2); };
+
+function wzPreview() {
+  const t = Bank.TIERS[wz.tier], sh = Bank.SHIPPING[wz.speed];
+  return cardFace({ bg: Bank.DESIGNS[wz.design].bg, badge: t.label.toUpperCase(), number: '9999 •••• •••• ••••', name: wz.name || 'YOUR NAME', expiry: wzExpiry() }) +
+    `<div class="wz-sum"><div class="stat"><span>${esc(t.label)} card</span><b>${fmt(t.fee)}</b></div>
+      <div class="stat"><span>${esc(sh.label)}</span><b>${sh.fee ? fmt(sh.fee) : 'Free'}</b></div>
+      <div class="stat total"><span>Total</span><b>${fmt(wzTotal())}</b></div></div>`;
+}
+function wzStepHtml() {
+  const s = wz.step;
+  if (s === 1) return `<h2 class="wz-h">Choose your card</h2><div class="tier-grid">${Object.entries(Bank.TIERS).map(([k, x]) => {
+    const [a, b] = Bank.ETA_DAYS[k].standard;
+    return `<label class="tier"><input type="radio" name="tier" value="${k}" ${k === wz.tier ? 'checked' : ''}><div class="tier-in"><div class="mini" style="background:${Bank.DESIGNS[Bank.DESIGNS_BY_TIER[k][0]].bg}"></div><b>${esc(x.label)}</b><small><b>${fmt(x.fee)}</b> one-time fee</small><small class="muted">${esc(x.note)}</small><small class="muted">Delivery in ${a}-${b} business days</small></div></label>`;
+  }).join('')}</div>`;
+  if (s === 2) return `<h2 class="wz-h">Make it yours</h2>
+    <label class="lbl">Design</label>
+    <div class="swatches">${Bank.DESIGNS_BY_TIER[wz.tier].map(d => `<label class="sw"><input type="radio" name="design" value="${d}" ${d === wz.design ? 'checked' : ''}><i style="background:${Bank.DESIGNS[d].bg}"></i><span>${esc(Bank.DESIGNS[d].label)}</span></label>`).join('')}</div>
+    <div class="field"><label for="cName">Name on card</label><input class="input" id="cName" maxlength="22" autocomplete="cc-name" value="${esc(wz.name)}"><small class="muted">3 to 22 letters. Spaces, . ' and - are allowed.</small></div>`;
+  if (s === 3) return `<h2 class="wz-h">Where should we send it?</h2>
+    <div class="field"><label for="cAddr">Street address</label><input class="input" id="cAddr" placeholder="123 Main St" autocomplete="address-line1" value="${esc(wz.address)}"></div>
+    <div class="field"><label for="cApt">Apt / Suite (optional)</label><input class="input" id="cApt" autocomplete="address-line2" value="${esc(wz.apt)}"></div>
+    <div class="row"><div class="field"><label for="cCity">City</label><input class="input" id="cCity" autocomplete="address-level2" value="${esc(wz.city)}"></div>
+    <div class="field"><label for="cState">State</label><select class="input" id="cState"><option value="">Select</option>${Bank.STATES.map(x => `<option ${x === wz.state ? 'selected' : ''}>${x}</option>`).join('')}</select></div></div>
+    <div class="row"><div class="field"><label for="cZip">ZIP code</label><input class="input" id="cZip" inputmode="numeric" maxlength="5" placeholder="10001" autocomplete="postal-code" value="${esc(wz.zip)}"></div>
+    <div class="field"><label for="cPhone">Phone</label><input class="input" id="cPhone" inputmode="tel" autocomplete="tel" value="${esc(wz.phone)}"></div></div>
+    <label class="lbl">Delivery speed</label>
+    <div class="speeds">${Object.entries(Bank.SHIPPING).map(([k, x]) => `<label class="speed"><input type="radio" name="speed" value="${k}" ${k === wz.speed ? 'checked' : ''}><div class="speed-in"><div><b>${esc(x.label)}</b><small class="muted">Arrives ${wzRange(wz.tier, k)}</small></div><b>${x.fee ? '+' + fmt(x.fee) : 'Free'}</b></div></label>`).join('')}</div>`;
+  const t = Bank.TIERS[wz.tier], sh = Bank.SHIPPING[wz.speed], total = wzTotal();
+  return `<h2 class="wz-h">Review your order</h2>
+    <div class="summary">
+      <div class="stat"><span>Card</span><b>${esc(t.label)}</b></div>
+      <div class="stat"><span>Design</span><b>${esc(Bank.DESIGNS[wz.design].label)}</b></div>
+      <div class="stat"><span>Name on card</span><b>${esc(wz.name)}</b></div>
+      <div class="stat"><span>Deliver to</span><b>${esc(wz.address)}${wz.apt ? ', ' + esc(wz.apt) : ''}, ${esc(wz.city)}, ${esc(wz.state)} ${esc(wz.zip)}</b></div>
+      <div class="stat"><span>Delivery</span><b>${esc(sh.label)} · ${wzRange(wz.tier, wz.speed)}</b></div>
+      <div class="stat"><span>Card fee</span><b>${fmt(t.fee)}</b></div>
+      <div class="stat"><span>Shipping</span><b>${sh.fee ? fmt(sh.fee) : 'Free'}</b></div>
+      <div class="stat total"><span>Total</span><b>${fmt(total)}</b></div>
+      <div class="stat"><span>Balance after order</span><b>${fmt(me.balance - total)}</b></div>
     </div>
-    <div class="stat"><span>Card fee</span><b id="feeOut"></b></div>
-    <div class="stat"><span>Available balance</span><b>${fmt(me.balance)}</b></div>
-    <button class="btn btn-primary btn-block" style="margin-top:16px">Request card</button>
-  </form>`;
+    ${me.balance < total ? '<p class="warn">Your balance is too low for this order. Add money first, then come back.</p>' : '<p class="muted small" style="margin-top:10px">You will confirm with your PIN. The total is taken from your account when you place the order.</p>'}`;
+}
+function wzDone() {
+  const c = wz.placed, t = Bank.TIERS[c.tier], d = Bank.DESIGNS[c.design];
+  return `<div class="panel wz-done">
+    <div class="ok-ring">✓</div>
+    <h1 class="page-title" style="margin:10px 0 4px">Order placed</h1>
+    <p class="muted">We will email you when it ships. Keep your order number handy.</p>
+    <div class="order-no" id="orderNo">${esc(c.orderNo)}</div>
+    <div class="wz-done-card">${cardFace({ bg: d.bg, badge: t.label.toUpperCase(), number: c.number.slice(0, 4) + ' •••• •••• ' + c.number.slice(-4), name: c.nameOnCard, expiry: c.expiry })}</div>
+    <div class="summary" style="text-align:left">
+      <div class="stat"><span>Estimated delivery</span><b>${Bank.fmtDay(c.etaMin)} – ${Bank.fmtDay(c.etaMax)}</b></div>
+      <div class="stat"><span>Delivery</span><b>${esc(Bank.SHIPPING[c.shipSpeed].label)}</b></div>
+      <div class="stat"><span>Deliver to</span><b>${esc(c.delivery.address)}${c.delivery.apt ? ', ' + esc(c.delivery.apt) : ''}, ${esc(c.delivery.city)}, ${esc(c.delivery.state)} ${esc(c.delivery.zip)}</b></div>
+      <div class="stat"><span>Total paid</span><b>${fmt(t.fee + c.shipFee)}</b></div>
+    </div>
+    <div class="card-actions" style="justify-content:center"><button class="btn btn-primary" data-go="cards">Track order</button><button class="btn" data-go="home">Back to home</button></div>
+  </div>`;
+}
+function viewCardReq() {
+  if (!wz) wz = wzNew();
+  if (wz.placed) return wzDone();
+  const s = wz.step;
+  return `<button class="btn btn-sm" data-go="cards">← Back to cards</button>
+  <h1 class="page-title" style="margin-top:14px">Order a debit card</h1>
+  <div class="wz-prog" aria-label="Step ${s} of 4">${WZ_STEPS.map((l, i) => `<div class="wz-p ${i + 1 < s ? 'done' : ''} ${i + 1 === s ? 'now' : ''}"><i>${i + 1 < s ? '✓' : i + 1}</i><span>${l}</span></div>`).join('')}</div>
+  <div class="wz">
+    <div class="wz-preview" id="wzPreview">${wzPreview()}</div>
+    <form class="panel wz-form" id="wzForm" novalidate>${wzStepHtml()}
+      <p class="warn" id="wzErr" role="alert" style="display:none"></p>
+      <div class="wz-nav">${s > 1 ? '<button type="button" class="btn" id="wzBack">Back</button>' : '<span></span>'}<button class="btn btn-primary" id="wzNext">${s === 4 ? 'Place order · ' + fmt(wzTotal()) : 'Continue'}</button></div>
+    </form>
+  </div>`;
 }
 
 function filteredTx() {
@@ -360,25 +428,48 @@ const wire = {
     };
   },
   cardreq() {
-    const upd = () => {
-      const tier = $('input[name=tier]:checked').value, t = Bank.TIERS[tier];
-      $('#shipBox').style.display = t.physical ? 'block' : 'none';
-      $('#feeOut').textContent = fmt(t.fee) + ' (one-time)';
+    if (wz.placed) {
+      const no = $('#orderNo'); if (no) no.onclick = () => { navigator.clipboard && navigator.clipboard.writeText(wz.placed.orderNo).then(() => toast('Order number copied')).catch(() => {}); };
+      return;
+    }
+    const go = n => { wz.step = n; show('cardreq'); window.scrollTo(0, 0); };
+    const redrawPreview = () => { $('#wzPreview').innerHTML = wzPreview(); FX.tilt($('#wzPreview')); };
+    const val = id => { const el = $(id); return el ? el.value : ''; };
+    const read = () => {
+      if (wz.step === 2) wz.name = val('#cName').toUpperCase();
+      if (wz.step === 3) Object.assign(wz, { address: val('#cAddr').trim(), apt: val('#cApt').trim(), city: val('#cCity').trim(), state: val('#cState'), zip: val('#cZip'), phone: val('#cPhone') });
     };
-    $$('input[name=tier]').forEach(r => r.addEventListener('change', upd)); upd();
-    digitsOnly($('#cPhone')); digitsOnly($('#cZip'));
-    $('#cardForm').onsubmit = async e => {
-      e.preventDefault();
-      const tier = $('input[name=tier]:checked').value, t = Bank.TIERS[tier];
-      const o = { tier, nameOnCard: $('#cName').value, address: $('#cAddr').value, apt: $('#cApt').value, city: $('#cCity').value, state: $('#cState').value, zip: $('#cZip').value, phone: $('#cPhone').value };
-      if (t.fee > me.balance) return toast(`Insufficient balance. This card has a ${fmt(t.fee)} fee. Add money first.`, 'err');
-      const rows = [['Card', t.label + (t.physical ? ' (physical)' : ' (virtual)')], ['Name', o.nameOnCard.toUpperCase()], ['Issuance fee', fmt(t.fee)]];
-      if (t.physical) rows.push(['Deliver to', `${o.address}${o.apt ? ', ' + o.apt : ''}, ${o.city}, ${o.state} ${o.zip}`]);
-      if (!await confirmModal('Confirm card request', rows, 'Continue')) return;
+    $$('input[name=tier]').forEach(r => r.addEventListener('change', () => { wz.tier = r.value; wz.design = Bank.DESIGNS_BY_TIER[wz.tier][0]; redrawPreview(); }));
+    $$('input[name=design]').forEach(r => r.addEventListener('change', () => { wz.design = r.value; redrawPreview(); }));
+    $$('input[name=speed]').forEach(r => r.addEventListener('change', () => { wz.speed = r.value; redrawPreview(); }));
+    const nm = $('#cName');
+    if (nm) nm.addEventListener('input', () => { wz.name = nm.value.toUpperCase(); const el = $('#wzPreview .wz-name'); if (el) el.textContent = wz.name || 'YOUR NAME'; });
+    if ($('#cPhone')) { digitsOnly($('#cZip')); }
+    const clearBad = () => { const e = $('#wzErr'); if (e) e.style.display = 'none'; };
+    const bad = m => { const e = $('#wzErr'); e.textContent = m; e.style.display = 'block'; e.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); };
+    $('#wzForm').addEventListener('input', clearBad); $('#wzForm').addEventListener('change', clearBad);
+    const bk = $('#wzBack'); if (bk) bk.onclick = () => { read(); go(wz.step - 1); };
+    $('#wzForm').onsubmit = async e => {
+      e.preventDefault(); read(); clearBad();
+      if (wz.step === 2 && !/^[A-Z][A-Z .'-]{2,21}$/.test(wz.name.trim())) return bad('Name on card must be 3 to 22 letters.');
+      if (wz.step === 3) {
+        if (wz.address.length < 5) return bad('Enter your street address.');
+        if (wz.city.length < 2) return bad('Enter your city.');
+        if (!wz.state) return bad('Choose your state.');
+        if (!/^\d{5}$/.test(wz.zip)) return bad('Enter a 5-digit ZIP code.');
+        const pd = wz.phone.replace(/\D/g, ''); if (pd.length < 10 || pd.length > 15) return bad('Enter a valid phone number.');
+      }
+      if (wz.step < 4) return go(wz.step + 1);
+      const total = wzTotal();
+      if (total > me.balance) return bad(`Insufficient balance. This order totals ${fmt(total)}. Add money first.`);
+      if (wz.busy) return;
       const pin = await askPin(); if (!pin) return;
+      wz.busy = true; const btn = $('#wzNext'); if (btn) { btn.disabled = true; btn.textContent = 'Placing order...'; }
+      const o = { tier: wz.tier, design: wz.design, speed: wz.speed, nameOnCard: wz.name.trim(), address: wz.address, apt: wz.apt, city: wz.city, state: wz.state, zip: wz.zip, phone: wz.phone };
       const r = await Bank.requestCard(me.id, o, pin);
-      if (!r.ok) return toast(r.msg, 'err');
-      await refresh(); toast(t.physical ? 'Card requested. Track delivery below.' : 'Virtual card is ready!'); show('cards');
+      wz.busy = false;
+      if (!r.ok) { if (btn) { btn.disabled = false; btn.textContent = 'Place order · ' + fmt(total); } return bad(r.msg); }
+      wz.placed = r.card; await refresh(); show('cardreq'); window.scrollTo(0, 0);
     };
   },
   history() {
@@ -593,6 +684,7 @@ async function show(r) {
     return;
   }
   const changed = route !== lastShown; lastShown = route;
+  if (route === 'cardreq' && changed) wz = null;        // a fresh order each time the page is opened
   const v = $('#view');
   v.classList.toggle('noanim', !changed);
   v.innerHTML = VIEWS[route]();

@@ -11,8 +11,20 @@ const Bank = (() => {
     STATES: 'AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY'.split(' '),
     // fee / label / physical come from the server; the colours and notes are display only
     TIERS: {
-      standard: { label: 'Standard', fee: 1500, physical: true,  bg: 'linear-gradient(135deg,#1c2538,#3e4e70)', note: 'Physical card. Arrives in 10-15 business days.' },
-      platinum: { label: 'Premier',  fee: 3500, physical: true,  bg: 'linear-gradient(135deg,#2a2210,#c09a45)', note: 'Premium design. Expedited, 5-10 business days.' }
+      standard: { label: 'Standard', fee: 1500, physical: true,  bg: 'linear-gradient(135deg,#1c2538,#3e4e70)', note: 'Classic physical card with four colour choices.' },
+      platinum: { label: 'Premier',  fee: 3500, physical: true,  bg: 'linear-gradient(135deg,#2a2210,#c09a45)', note: 'Premium metal-look card. Faster delivery.' }
+    },
+    SHIPPING: { standard: { label: 'Standard delivery', fee: 0 }, express: { label: 'Express delivery', fee: 2500 } },
+    ETA_DAYS: { standard: { standard: [10, 15], express: [5, 7] }, platinum: { standard: [5, 10], express: [3, 5] } },
+    DESIGNS_BY_TIER: { standard: ['midnight', 'emerald', 'ocean', 'violet'], platinum: ['gold', 'onyx', 'rose'] },
+    DESIGNS: {
+      midnight: { label: 'Midnight', bg: 'linear-gradient(135deg,#1c2538,#3e4e70)' },
+      emerald:  { label: 'Emerald',  bg: 'linear-gradient(135deg,#0d7a56,#2ee59d)' },
+      ocean:    { label: 'Ocean',    bg: 'linear-gradient(135deg,#0b4fa8,#18b4ff)' },
+      violet:   { label: 'Violet',   bg: 'linear-gradient(135deg,#4b2a9a,#b46bff)' },
+      gold:     { label: 'Gold',     bg: 'linear-gradient(135deg,#2a2210,#c09a45)' },
+      onyx:     { label: 'Onyx',     bg: 'linear-gradient(135deg,#0a0a0a,#3d3d46)' },
+      rose:     { label: 'Rose',     bg: 'linear-gradient(135deg,#5a1f3a,#e08aa8)' }
     },
     STAGES: ['requested', 'processing', 'shipped', 'delivered', 'active'],
     STAGE_LABEL: { requested: 'Requested', processing: 'Processing', shipped: 'On the way', delivered: 'Delivered', active: 'Active' }
@@ -22,8 +34,15 @@ const Bank = (() => {
   B.toKobo = s => { const n = Math.round(parseFloat(String(s).replace(/,/g, '')) * 100); return Number.isFinite(n) ? n : NaN; };   // dollars text -> cents
   B.newKey = () => (window.crypto && crypto.randomUUID ? crypto.randomUUID() : 'k' + Date.now().toString(36) + Math.random().toString(36).slice(2, 12));
 
+  B.addBusinessDays = (ts, n) => { const d = new Date(ts); while (n > 0) { d.setDate(d.getDate() + 1); const w = d.getDay(); if (w !== 0 && w !== 6) n--; } return d.getTime(); };
+  B.eta = (tier, speed, from) => { const d = B.ETA_DAYS[tier][speed], t0 = from || Date.now(); return [B.addBusinessDays(t0, d[0]), B.addBusinessDays(t0, d[1])]; };
+  B.fmtDay = ts => new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).replace(' ', '\u00a0');
+
   B.applyConfig = c => {
     if (!c) return;
+    if (c.shipping) B.SHIPPING = c.shipping;
+    if (c.etaDays) B.ETA_DAYS = c.etaDays;
+    if (c.designs) B.DESIGNS_BY_TIER = c.designs;
     B.ROUTING = c.routing; B.DAILY_LIMIT = c.dailyLimit; B.MAX_TOPUP = c.maxDeposit; B.MAX_CARDS = c.maxCards;
     B.BILL_CATEGORIES = c.billCategories; B.STATES = c.states;
     Object.keys(c.tiers).forEach(k => { if (B.TIERS[k]) Object.assign(B.TIERS[k], c.tiers[k]); });

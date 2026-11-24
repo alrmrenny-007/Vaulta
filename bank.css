@@ -1,5 +1,5 @@
 /* Dashboard app shell, cards, modals. Builds on styles.css variables. */
-.app-shell{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+.app-shell{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100vh}
 .sidebar{border-right:1px solid var(--border);padding:22px 14px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:4px}
 .sidebar .logo{padding:0 10px 18px;display:block}
 .side-link{display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:12px;color:var(--muted);font:inherit;font-weight:600;cursor:pointer;border:none;background:none;text-align:left;width:100%}
@@ -15,7 +15,7 @@
 .card-foot{display:flex;justify-content:space-between;align-items:end;gap:10px;flex-wrap:wrap}
 .row-btns{display:flex;gap:8px}
 .glass{color:#fff;border-color:rgba(255,255,255,.5)}
-.quick{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:20px 0}
+.quick{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:20px 0}
 .quick button{background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:16px 8px;font:inherit;font-weight:600;font-size:.88rem;cursor:pointer;display:flex;flex-direction:column;gap:6px;align-items:center}
 .quick button:hover{border-color:var(--accent)}
 .quick .ic{font-size:1.5rem}
@@ -57,7 +57,7 @@ select.input{appearance:none}
 .vc-bot small{display:block;opacity:.7;font-size:.62rem;letter-spacing:1px;font-weight:500}
 .vc-ov{position:absolute;inset:0;background:rgba(7,11,18,.62);display:grid;place-items:center;font-weight:800;font-size:1.1rem;z-index:2;backdrop-filter:blur(2px)}
 .vc-ov.soft{background:rgba(7,11,18,.4);align-items:end;justify-content:end;padding:14px;font-size:.8rem}
-.card-block{display:grid;grid-template-columns:minmax(0,380px) 1fr;gap:22px;align-items:start}
+.card-block{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:22px;align-items:start}
 .card-block+.card-block{margin-top:26px;padding-top:26px;border-top:1px solid var(--border)}
 .card-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
 .btn-danger{color:var(--danger);border-color:rgba(255,93,115,.5)}
@@ -69,7 +69,7 @@ select.input{appearance:none}
 .step.done{color:var(--text)}
 .step.done i{background:var(--accent);border-color:var(--accent)}
 .step.done::before{background:var(--accent)}
-.tier-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:8px 0 18px}
+.tier-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:8px 0 18px}
 .tier input{position:absolute;opacity:0}
 .tier{position:relative;cursor:pointer}
 .tier-in{border:1px solid var(--border);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:4px;height:100%}
@@ -94,15 +94,15 @@ select.input{appearance:none}
 .sec-title{margin:0 0 12px}
 
 @media(max-width:820px){
-  .app-shell{grid-template-columns:1fr}
+  .app-shell{grid-template-columns:minmax(0,1fr)}
   .sidebar{display:none}
   .main{padding:16px 16px 100px}
   .bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);z-index:50}
   .bottom-nav button{flex:1;background:none;border:none;color:var(--muted);font:inherit;font-size:.7rem;font-weight:600;padding:10px 0 12px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
   .bottom-nav button span{font-size:1.25rem}
   .bottom-nav button.active{color:var(--accent)}
-  .card-block{grid-template-columns:1fr}
-  .tier-grid{grid-template-columns:1fr}
+  .card-block{grid-template-columns:minmax(0,1fr)}
+  .tier-grid{grid-template-columns:minmax(0,1fr)}
   .bal-big{font-size:1.8rem}
   .toast{bottom:100px}
 }
@@ -260,3 +260,10 @@ select.input{appearance:none}
 #wzNext{flex:1 1 auto}#wzBack{flex:0 0 auto;min-width:96px}
 .wz-nav .btn{padding-left:14px;padding-right:14px}
 @media(max-width:420px){.wz-nav{flex-direction:column-reverse}.wz-nav .btn{width:100%}}
+
+/* ---- long text must never stretch the page ---- */
+.main,.panel,.tx,.tx-mid,.bank-card,.card-block>*{min-width:0}
+.tx-mid{flex:1 1 auto}
+.tx-mid b{display:block;overflow-wrap:anywhere}
+.tx-amt{flex:none;white-space:nowrap}
+.stat b{overflow-wrap:anywhere}
